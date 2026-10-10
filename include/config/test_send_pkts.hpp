@@ -54,13 +54,13 @@
 
 #include "ib_transport_protocol/ib_transport_protocol.hpp"
 #include "tb_config.hpp"
-#include "tests.hpp"   // MemExpect / ReplyExpect / DropExpect
+#include "tests_responder.hpp"   // MemExpect / ReplyExpect / DropExpect
 
 // ---- Parameters that must match the module ----
 static constexpr int64_t  MRC_WINDOW = 128;   // responder max_psn_range, in packets
 static constexpr uint32_t PKT        = 1024;  // payload of FIRST/MIDDLE packets: must equal the module's PMTU
 
-// ---- Request BTH flags (F_*) and RelExpect live in tests.hpp ----
+// ---- Request BTH flags (F_*) and RelExpect live in tests_responder.hpp ----
 
 // What an out-of-window packet produces. Spec 6.3.1 rule 6 says "silently dropped",
 // but Table 7-3 lists PSN_OOR_WINDOW (0x0B) as a mandatory NACK. Pick the one the module implements.

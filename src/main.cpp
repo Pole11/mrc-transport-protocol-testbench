@@ -33,7 +33,7 @@
  *                      (no ICRC: already removed upstream)
  *   The "verb" is simply the BTH opcode.
  *
- * HOW PACKETS ARE FED (see tests.hpp)
+ * HOW PACKETS ARE FED (see tests_responder.hpp)
  *   The scenario (tests_config.hpp) is a list of packets, one per row. Each row says what follows it:
  *   the next packet back to back, N idle cycles, or DRAIN (wait, then check the group of packets).
  *   Beats are fed at most one per cycle and only when the module's input has room, like a real link,
@@ -71,9 +71,10 @@
 #include "pkt_data_builder.hpp"
 #include "pkt_ctrl_builder.hpp"
 #include "dut_ib_transport_protocol.hpp"
-#include "tests.hpp"
+#include "tests_responder.hpp"
 #include "test_mrc_ctrl_hdrs.hpp"
 #include "test_send_pkts.hpp"
+#include "test_requestor_pkts.hpp"
 
 using namespace hls;
 
@@ -173,6 +174,10 @@ int main()
 	std::cout << "[TB] regInvalidPsnDropCount = " << dut.regInvalidPsnDropCount.to_uint() << std::endl;
 	checkCount("packets received by the module", dut.regIbvCountRx.to_uint(), steps.size());
 	checkCount("packets sent by the module (ACK/NAK)", dut.regIbvCountTx.to_uint(), expectedReplies);
+
+	// Requestor scenario (step C), after the counters above, which only cover the responder scenario
+	if (RUN_REQUESTOR_TESTS)
+		runRequestorScenario(dut, REQ_SCENARIO);
 
 	std::cout << std::endl << (g_failures == 0 ? "*** ALL CHECKS PASSED ***" : "*** SOME CHECKS FAILED ***")
 	          << "  (" << std::dec << g_failures << " failure(s), " << g_cycle << " cycles simulated)" << std::endl;

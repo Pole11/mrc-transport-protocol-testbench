@@ -27,3 +27,8 @@ static const size_t   MAX_DUMP_BYTES   = 64;         // hex dumps longer than th
 static const bool     RUN_MRC_CTRL_UNIT_TESTS = true; // parser unit checks of the MRC control headers
 
 static const int BYTES_PER_BEAT = DATA_WIDTH / 8;    // 64 for a 512-bit data path
+
+// --- Requestor scenario (step C): QPs of the module that SEND writes; the TB plays their responder ---
+static const bool     RUN_REQUESTOR_TESTS = true;
+static const int      REQ_DRAIN_CYCLES    = 200;  // short groups: the csim Local ACK timer fires after ~10 x MAX_QPS cycles
+static const int      REQ_NACK_GAP        = 80;   // idle cycles after a post / between NACKs: each resend completes first
