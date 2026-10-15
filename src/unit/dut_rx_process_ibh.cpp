@@ -25,6 +25,33 @@ namespace
 {
     #define RX_PROCESS_IBH_INSTID 2
 
+    struct BthTestCase
+    {
+        // misc
+        const char* name;
+
+        // BTH
+        uint8_t opcode;
+        uint16_t p_key;
+        uint32_t dqp;   // 24 bits
+        uint8_t a;      // 1 bit
+        uint8_t R;      // 1 bit
+        uint8_t rtx;    // 1 bit
+        uint8_t ts;     // 1 bit
+        uint32_t psn;   // 24 bits
+
+        // bytes after the BTH (not parsed by rx_process_ibh, only forwarded)
+        uint16_t payload_len;
+
+        // expected
+        ibhMeta exp_metaToIbhFsmOut;
+        mrcEthMeta exp_metaToStripCtrlOut;
+        mrcCtrlBthMeta exp_metaToProcCtrlOut;
+        bool exp_isCtrlDataOut;
+	    bool exp_isCtrlUdpOut;
+        ap_uint<32> exp_regIbvCountRx;
+    };
+
     struct RxProcessIbhTestBench
     {
 #ifdef DBG_IBV
@@ -58,32 +85,20 @@ namespace
         }
     };
 
-    struct BthTestCase
+    std::vector<uint8_t> buildBthHeader(const BthTestCase& testCase)
     {
-        // misc
-        const char* name;
+        std::vector<uint8_t> packet;
+        
+        appendNetworkOrder8(packet, testCase.opcode);
+        appendNetworkOrder8(packet, 0); // pad and tver=0
+        appendNetworkOrder16(packet, testCase.p_key);
+        appendNetworkOrder8(packet, 0); // var-res
+        appendNetworkOrder24(packet, testCase.dqp);
+        appendNetworkOrder8(packet, (testCase.a << 7) | (testCase.R << 6) | (testCase.rtx << 5) | (testCase.ts << 4)); // a, R, rtx, ts
+        appendNetworkOrder24(packet, testCase.psn);
 
-        // BTH
-        uint8_t opcode;
-        uint16_t p_key;
-        uint32_t dqp;   // 24 bits
-        uint8_t a;      // 1 bit
-        uint8_t R;      // 1 bit
-        uint8_t rtx;    // 1 bit
-        uint8_t ts;     // 1 bit
-        uint32_t psn;   // 24 bits
-
-        // bytes after the BTH (not parsed by rx_process_ibh, only forwarded)
-        uint16_t payload_len;
-
-        // expected
-        ibhMeta exp_metaToIbhFsmOut;
-        mrcEthMeta exp_metaToStripCtrlOut;
-        mrcCtrlBthMeta exp_metaToProcCtrlOut;
-        bool exp_isCtrlDataOut;
-	    bool exp_isCtrlUdpOut;
-        ap_uint<32> exp_regIbvCountRx;
-    };
+        return packet;
+    }
 
     bool checkBthProcessed(RxProcessIbhTestBench& tb, const BthTestCase& tc, const std::vector<net_axis<DATA_WIDTH> >& sentWords)
     {
@@ -207,15 +222,8 @@ int runRxProcessIbhTest()
         std::cout << "\n" << tc.name << "\n" << std::endl;
 
         std::vector<uint8_t> packet;
-
         // BTH
-        appendNetworkOrder8(packet, tc.opcode);
-        appendNetworkOrder8(packet, 0); // pad and tver=0
-        appendNetworkOrder16(packet, tc.p_key);
-        appendNetworkOrder8(packet, 0); // var-res
-        appendNetworkOrder24(packet, tc.dqp);
-        appendNetworkOrder8(packet, (tc.a << 7) | (tc.R << 6) | (tc.rtx << 5) | (tc.ts << 4)); // a, R, rtx, ts
-        appendNetworkOrder24(packet, tc.psn);
+        packet = buildBthHeader(tc);
 
         // payload
         for (size_t i = 0; i < tc.payload_len; ++i) packet.push_back(static_cast<uint8_t>(tcIndex * 16 + i));
