@@ -5,10 +5,12 @@
 #include <string>
 #include <vector>
 
+#include "rocev2_config.hpp"
+#include "util.hpp"
+
 #include "axi_utils.hpp"
 #include "ib_transport_protocol/ib_transport_protocol.hpp"
 #include "ib_transport_protocol/mrc_headers.hpp"
-#include "rocev2_config.hpp"
 
 // todo: also add send queues and receive queues
 
@@ -25,6 +27,8 @@ namespace
     #define PMTU 1024
 
     #define VERY_BIG_NUMBER 1000
+
+    #define IB_TRANSPORT_PROTOCOL_INSTID 0
 
     // local QPs acting as responder (send writes)
     #define RSP_QP_0 0x08   // write 1
@@ -331,7 +335,7 @@ namespace
                 }
             }
 
-            ib_transport_protocol<DATA_WIDTH, 0>(
+            ib_transport_protocol<DATA_WIDTH, IB_TRANSPORT_PROTOCOL_INSTID>(
                 rx_meta, rx_data,
                 tx_meta, tx_data,
                 sq_meta,
@@ -352,35 +356,6 @@ namespace
 #endif
         }
     };
-
-    void appendNetworkOrder8(std::vector<uint8_t>& packet, uint8_t byte)
-    {
-        packet.push_back(byte);
-    }
-
-    void appendNetworkOrder16(std::vector<uint8_t>& packet, uint16_t value)
-    {
-        appendNetworkOrder8(packet, static_cast<uint8_t>(value >> 8));
-        appendNetworkOrder8(packet, static_cast<uint8_t>(value));
-    }
-
-    void appendNetworkOrder24(std::vector<uint8_t>& packet, uint32_t value)
-    {
-        appendNetworkOrder8(packet, static_cast<uint8_t>(value >> 16));
-        appendNetworkOrder16(packet, static_cast<uint16_t>(value));
-    }
-
-    void appendNetworkOrder32(std::vector<uint8_t>& packet, uint32_t value)
-    {
-        appendNetworkOrder16(packet, static_cast<uint16_t>(value >> 16));
-        appendNetworkOrder16(packet, static_cast<uint16_t>(value));
-    }
-
-    void appendNetworkOrder64(std::vector<uint8_t>& packet, uint64_t value)
-    {
-        appendNetworkOrder32(packet, static_cast<uint32_t>(value >> 32));
-        appendNetworkOrder32(packet, static_cast<uint32_t>(value));
-    }
 
     std::vector<uint8_t> buildWritePayload(size_t len, uint8_t seed)
     {
