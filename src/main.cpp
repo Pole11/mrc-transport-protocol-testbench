@@ -3,12 +3,14 @@
 int runIbTransportProtocolTest();
 int runRxProcessIbhTest();
 int runSplitIpUdpMetaTest();
+int runSplitCtrlTest();
 
 int main()
 {
     const int ibTransportProtocolTestResult = runIbTransportProtocolTest();
     const int rxProcessIbhTestResult = runRxProcessIbhTest();
     const int runSplitIpUdpMetaTestResult = runSplitIpUdpMetaTest();
+    const int runSplitCtrlTestResult = runSplitCtrlTest();
 
     if (ibTransportProtocolTestResult == 0)
         std::cout << "[PASS] ib_transport_protocol test\n";
@@ -25,6 +27,13 @@ int main()
     else
         std::cerr << "[FAIL] rx_split_udp_meta test\n";
 
+    if (runSplitCtrlTestResult == 0)
+        std::cout << "[PASS] rx_split_ctrl test\n";
+    else
+        std::cerr << "[FAIL] rx_split_ctrl test\n";
 
-    return ibTransportProtocolTestResult || rxProcessIbhTestResult || runSplitIpUdpMetaTestResult;
+    return ibTransportProtocolTestResult || 
+        rxProcessIbhTestResult || 
+        runSplitIpUdpMetaTestResult || 
+        runSplitCtrlTestResult;
 }

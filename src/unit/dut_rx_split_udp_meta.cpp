@@ -11,7 +11,7 @@
 #include "axi_utils.hpp"
 #include "ib_transport_protocol/ib_transport_protocol_impl.hpp"
 
-// this module must output input ipUdpMeta (remote address, remote port, local port, length)
+// this module must output the input ipUdpMeta (remote address, remote port, local port, length)
 // 1. to dataOut if splitIn = False
 // 2. to ctrlOut if splitIn = True
 
