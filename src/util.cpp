@@ -28,3 +28,10 @@ void appendNetworkOrder64(std::vector<uint8_t>& packet, uint64_t value)
     appendNetworkOrder32(packet, static_cast<uint32_t>(value >> 32));
     appendNetworkOrder32(packet, static_cast<uint32_t>(value));
 }
+
+std::vector<uint8_t> buildWritePayload(size_t len, uint8_t seed)
+{
+    std::vector<uint8_t> v(len);
+    for (size_t i = 0; i < len; i++) v[i] = static_cast<uint8_t>(seed + i);
+    return v;
+}

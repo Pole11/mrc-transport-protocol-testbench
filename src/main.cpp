@@ -4,6 +4,7 @@ int runIbTransportProtocolTest();
 int runRxProcessIbhTest();
 int runSplitIpUdpMetaTest();
 int runSplitCtrlTest();
+int runStripMrcEthTest();
 
 int main()
 {
@@ -11,6 +12,7 @@ int main()
     const int rxProcessIbhTestResult = runRxProcessIbhTest();
     const int runSplitIpUdpMetaTestResult = runSplitIpUdpMetaTest();
     const int runSplitCtrlTestResult = runSplitCtrlTest();
+    const int runStripMrcEthTestResult = runStripMrcEthTest();
 
     if (ibTransportProtocolTestResult == 0)
         std::cout << "[PASS] ib_transport_protocol test\n";
@@ -32,8 +34,15 @@ int main()
     else
         std::cerr << "[FAIL] rx_split_ctrl test\n";
 
+    if (runStripMrcEthTestResult == 0)
+        std::cout << "[PASS] rx_strip_mrc_eth test\n";
+    else
+        std::cerr << "[FAIL] rx_strip_mrc_eth test\n";
+
+
     return ibTransportProtocolTestResult || 
         rxProcessIbhTestResult || 
         runSplitIpUdpMetaTestResult || 
-        runSplitCtrlTestResult;
+        runSplitCtrlTestResult ||
+        runStripMrcEthTestResult;
 }
