@@ -131,6 +131,7 @@ namespace
             expect("ibhMeta.ackReq",        m.ackReq,        e.ackReq);
             expect("ibhMeta.rtx",           m.rtx,           e.rtx);
             expect("ibhMeta.ts",            m.ts,            e.ts);
+            // do not check msnInc and cack because they are untouched by this module
         }
         if (expDataMetas && !tb.metaToStripCtrlOut.empty()) {
             const mrcEthMeta m = tb.metaToStripCtrlOut.read();
