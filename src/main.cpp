@@ -1,11 +1,6 @@
 #include <iostream>
 
-int runIbTransportProtocolTest();
-int runRxProcessIbhTest();
-int runSplitIpUdpMetaTest();
-int runSplitCtrlTest();
-int runStripMrcEthTest();
-int runRxIbhFsmTest();
+#include "tests.hpp"
 
 int main()
 {

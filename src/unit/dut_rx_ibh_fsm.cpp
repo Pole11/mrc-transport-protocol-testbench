@@ -8,6 +8,7 @@
 
 #include "rocev2_config.hpp"
 #include "util.hpp"
+#include "tests.hpp"
 
 #include "axi_utils.hpp"
 #include "ib_transport_protocol/ib_transport_protocol_impl.hpp"
@@ -101,7 +102,7 @@ namespace
             rx_ibh_fsm<RX_IBH_FSM_INSTID>(
 #ifdef DBG_IBV
                 m_axis_dbg,
-#endif
+    #endif
                 metaIn,
                 exhMetaFifo,
                 stateTable_rsp,

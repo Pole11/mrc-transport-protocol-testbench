@@ -7,6 +7,7 @@
 
 #include "rocev2_config.hpp"
 #include "util.hpp"
+#include "tests.hpp"
 
 #include "axi_utils.hpp"
 #include "ib_transport_protocol/ib_transport_protocol.hpp"

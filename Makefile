@@ -1,5 +1,5 @@
 XILINX_HLS ?= /tools/Xilinx/Vitis_HLS/2022.1
-NETSTACK   := ../Coyote-mrc/hw/services/network/hls
+NETSTACK   := ../Coyote-mrc/hw/services/network/hls # change me
 
 SRCS := $(wildcard src/*/*.cpp) \
         $(wildcard src/*.cpp) \
