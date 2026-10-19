@@ -276,7 +276,8 @@ namespace
     };
 
     enum class TestCaseKind : uint8_t { WRITE, ACK, SACK, NACK, PROBE, ENDPOINT_REQ, ENDPOINT_RES };
-    struct TestCase {
+    struct TestCase 
+    {
         TestCaseKind kind;
 
         WriteTestCase write;
@@ -799,7 +800,7 @@ namespace
         ACK_TC ({"MRC ACK F06",  MRC_ACK,  0xFFFF, REQ_QP_4, 0,0,0,0, 0x000003, 0x1F, 0, 3, DRAIN}),
 
         // PSN far ahead 
-        WRITE_TC({"MRC WRITE ONLY 01a", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+140, 0, 0, 0,0,0, 0x3000, RKEY, 64, 0x00000000, buildWritePayload(64,0xEE), false, true, FIRST_RX_PSN+0, 0, 0x60, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 01a", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+140, 0, 0, 0,0,0, 0x3000, RKEY, 64, 0x00000000, buildWritePayload(64,0xEE), false, false, 0, 0, 0x00, BACK_TO_BACK}),
         
         // in-order ONLY, same va, distinct fills 
         WRITE_TC({"MRC WRITE ONLY 02a", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+0, 0, 0, 0,0,0, 0x1000, RKEY, 1000, 0x00000000, buildWritePayload(1000,0x01), true, true, FIRST_RX_PSN+0, 1, 0x00, BACK_TO_BACK}),
@@ -815,9 +816,9 @@ namespace
         WRITE_TC({"MRC WRITE ONLY 03a", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+8, 0, 8, 0,0,0, 0x4000, RKEY, 1000, 0x00000000, buildWritePayload(1000,0x09), true,  true, FIRST_RX_PSN+8, 9, 0x00, BACK_TO_BACK}),
         WRITE_TC({"MRC WRITE ONLY 03b", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+8, 0, 8, 0,0,0, 0x4000, RKEY, 1000, 0x00000000, buildWritePayload(1000,0x09), false, true, FIRST_RX_PSN+8, 9, 0x00, BACK_TO_BACK}),
 
-        // older PSNs, not rewritten, re-ACKed todo: understand what PSN
-        WRITE_TC({"MRC WRITE ONLY 04a", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+4,  0, 0, 0,0,0, 0x5000, RKEY, 1024, 0x00000000, buildWritePayload(1024,0xEE), false, true, FIRST_RX_PSN+4,  9, 0x00, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 04b", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN-21, 0, 0, 0,0,0, 0x5000, RKEY, 1024, 0x00000000, buildWritePayload(1024,0xEE), false, true, FIRST_RX_PSN-21, 9, 0x00, BACK_TO_BACK}),
+        // older PSNs, not rewritten, re-ACKed with cack, not their own PSN
+        WRITE_TC({"MRC WRITE ONLY 04a", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+4,  0, 0, 0,0,0, 0x5000, RKEY, 1024, 0x00000000, buildWritePayload(1024,0xEE), false, true, FIRST_RX_PSN+8,  9, 0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 04b", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN-21, 0, 0, 0,0,0, 0x5000, RKEY, 1024, 0x00000000, buildWritePayload(1024,0xEE), false, true, FIRST_RX_PSN+8, 9, 0x00, BACK_TO_BACK}),
         WRITE_TC({"MRC WRITE ONLY 04c", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+8,  0, 0, 0,0,0, 0x5000, RKEY, 1024, 0x00000000, buildWritePayload(1024,0xEE), false, true, FIRST_RX_PSN+8,  9, 0x00, BACK_TO_BACK}),
 
         // multi-packet, RETH on every packet 
@@ -866,11 +867,11 @@ namespace
         WRITE_TC({"MRC WRITE ONLY 10c", MRC_RDMA_WRITE_ONLY_IMM,  0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+31, 0, 24, 0,0,0, 0x52000,     RKEY, 300,     0x00000000, buildWritePayload(300,0xE3), true, true, FIRST_RX_PSN+31, 25, 0x00, BACK_TO_BACK}),
 
         // PSN ahead (repo: NAK once, then silent), in order resets it 
-        WRITE_TC({"MRC WRITE ONLY 11a", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+182, 0, 0,  0,0,0, 0x2000, RKEY, 1024, 0x00000000, buildWritePayload(1024,0xEE), false, true,  FIRST_RX_PSN+32, 25, 0x60, BACK_TO_BACK}), 
+        WRITE_TC({"MRC WRITE ONLY 11a", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+182, 0, 0,  0,0,0, 0x2000, RKEY, 1024, 0x00000000, buildWritePayload(1024,0xEE), false, false, 0, 0, 0x00, BACK_TO_BACK}), 
         WRITE_TC({"MRC WRITE ONLY 11b", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+182, 0, 0,  0,0,0, 0x2000, RKEY, 1024, 0x00000000, buildWritePayload(1024,0xEE), false, false, 0, 0, 0x00, BACK_TO_BACK}), 
         WRITE_TC({"MRC WRITE ONLY 11c", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+182, 0, 0,  0,0,0, 0x2000, RKEY, 1024, 0x00000000, buildWritePayload(1024,0xEE), false, false, 0, 0, 0x00, BACK_TO_BACK}), 
         WRITE_TC({"MRC WRITE ONLY 11d", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+32,  0, 25, 0,0,0, 0x2000, RKEY, 1024, 0x00000000, buildWritePayload(1024,0x11), true,  true,  FIRST_RX_PSN+32, 26, 0x00, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 11e", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+183, 0, 0,  0,0,0, 0x2000, RKEY, 1024, 0x00000000, buildWritePayload(1024,0xEE), false, true,  FIRST_RX_PSN+33, 26, 0x60, BACK_TO_BACK}), 
+        WRITE_TC({"MRC WRITE ONLY 11e", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+183, 0, 0,  0,0,0, 0x2000, RKEY, 1024, 0x00000000, buildWritePayload(1024,0xEE), false, false, 0, 0, 0x00, BACK_TO_BACK}), 
         WRITE_TC({"MRC WRITE ONLY 11f", MRC_RDMA_WRITE_ONLY, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+183, 0, 0,  0,0,0, 0x2000, RKEY, 1024, 0x00000000, buildWritePayload(1024,0xEE), false, false, 0, 0, 0x00, BACK_TO_BACK}),
 
         // burst
@@ -895,42 +896,48 @@ namespace
         WRITE_TC({"MRC WRITE ONLY 14d", MRC_RDMA_WRITE_MIDDLE, 0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+46, 0, 34, 0,0,0, 0x81000+PMTU,   RKEY, 2*PMTU+30, 0x00000000, buildWritePayload(PMTU,0x17), true, false, 0,               0,  0x00, BACK_TO_BACK}),
         WRITE_TC({"MRC WRITE ONLY 14e", MRC_RDMA_WRITE_LAST,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+47, 0, 34, 0,0,0, 0x81000+2*PMTU, RKEY, 2*PMTU+30, 0x00000000, buildWritePayload(30,0x18),   true, true,  FIRST_RX_PSN+47, 35, 0x00, DRAIN}),
 
-        // PSN ahead of epsn but inside the 32-PSN window. CURRENT BEHAVIOUR: accepted, epsn jumps to psn+1,
-        // the skipped PSNs become "duplicates" (ACKed at their own PSN, never written).
-        // RC would NAK 15a; MRC would accept it, keep the hole in the bitmap and accept 15b later.
-        WRITE_TC({"MRC WRITE ONLY 15a", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+53, 0, 35, 0,0,0, 0x82000,        RKEY, 256,       0x00000000, buildWritePayload(256,0x19),  true,  true, FIRST_RX_PSN+53, 36, 0x00, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 15b", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+50, 0, 35, 0,0,0, 0x82100,        RKEY, 256,       0x00000000, buildWritePayload(256,0xEE),  false, true, FIRST_RX_PSN+50, 36, 0x00, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 15c", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+54, 0, 36, 0,0,0, 0x82200,        RKEY, 256,       0x00000000, buildWritePayload(256,0x1A),  true,  true, FIRST_RX_PSN+54, 37, 0x00, DRAIN}),
+        // two multi-packet messages out of order: A = +48..+51, B = +52..+54. Packets beyond the hole are written
+        // but not ACKed, a duplicate inside the window is ACKed with the current cack_psn. 15h closes the hole:
+        // cack_psn jumps to +54 and the pending ACK requests of 15c and 15e produce one ACK, MSN +2, although 15h has a = 0
+        WRITE_TC({"MRC WRITE ONLY 15a", MRC_RDMA_WRITE_MIDDLE, 0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+53, 0, 36, 0,0,0, 0x86000+PMTU,   RKEY, 2*PMTU+50,  0x00000000, buildWritePayload(PMTU,0x40), true,  false, 0,               0,  0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 15b", MRC_RDMA_WRITE_MIDDLE, 0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+50, 0, 35, 0,0,0, 0x82000+2*PMTU, RKEY, 3*PMTU+100, 0x00000000, buildWritePayload(PMTU,0x41), true,  false, 0,               0,  0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 15c", MRC_RDMA_WRITE_LAST,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+54, 0, 36, 0,0,0, 0x86000+2*PMTU, RKEY, 2*PMTU+50,  0x00000000, buildWritePayload(50,0x42),   true,  false, 0,               0,  0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 15d", MRC_RDMA_WRITE_FIRST,  0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+48, 0, 35, 0,0,0, 0x82000,        RKEY, 3*PMTU+100, 0x00000000, buildWritePayload(PMTU,0x43), true,  false, 0,               0,  0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 15e", MRC_RDMA_WRITE_LAST,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+51, 0, 35, 0,0,0, 0x82000+3*PMTU, RKEY, 3*PMTU+100, 0x00000000, buildWritePayload(100,0x44),  true,  false, 0,               0,  0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 15f", MRC_RDMA_WRITE_FIRST,  0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+52, 0, 36, 0,0,0, 0x86000,        RKEY, 2*PMTU+50,  0x00000000, buildWritePayload(PMTU,0x45), true,  false, 0,               0,  0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 15g", MRC_RDMA_WRITE_MIDDLE, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+53, 0, 36, 0,0,0, 0x86000+PMTU,   RKEY, 2*PMTU+50,  0x00000000, buildWritePayload(PMTU,0xEE), false, true,  FIRST_RX_PSN+48, 35, 0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 15h", MRC_RDMA_WRITE_MIDDLE, 0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+49, 0, 35, 0,0,0, 0x82000+PMTU,   RKEY, 3*PMTU+100, 0x00000000, buildWritePayload(PMTU,0x46), true,  true,  FIRST_RX_PSN+54, 37, 0x00, DRAIN}),
 
-        // window edge (epsn = +55): epsn+32 is NAKed, epsn+31 is accepted, then epsn+32 again is in order
-        WRITE_TC({"MRC WRITE ONLY 16a", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+87, 0, 37, 0,0,0, 0x83000,        RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, true, FIRST_RX_PSN+55, 37, 0x60, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 16b", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+86, 0, 37, 0,0,0, 0x83100,        RKEY, 64,        0x00000000, buildWritePayload(64,0x1B),   true,  true, FIRST_RX_PSN+86, 38, 0x00, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 16c", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+87, 0, 38, 0,0,0, 0x83200,        RKEY, 64,        0x00000000, buildWritePayload(64,0x1C),   true,  true, FIRST_RX_PSN+87, 39, 0x00, DRAIN}),
+        // window edge (epsn = +55): epsn+128 is dropped silently, epsn+127 is written but not ACKed (hole below it),
+        // epsn+128 is still dropped because accepting a packet beyond a hole does not move the window
+        WRITE_TC({"MRC WRITE ONLY 16a", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+183, 0, 37, 0,0,0, 0x83000,        RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, false, 0,               0,  0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 16b", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+182, 0, 37, 0,0,0, 0x83100,        RKEY, 64,        0x00000000, buildWritePayload(64,0x1B),   true,  false, 0,               0,  0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 16c", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+183, 0, 38, 0,0,0, 0x83200,        RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, false, 0,               0,  0x00, DRAIN}),
 
-        // only a VALID packet re-arms the NAK: a duplicate in between does not.
-        // The NAK is sent regardless of BTH.a (17e has a = 0)
-        WRITE_TC({"MRC WRITE ONLY 17a", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+200, 0, 39, 0,0,0, 0x84000,       RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, true,  FIRST_RX_PSN+88, 39, 0x60, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 17b", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+87,  0, 38, 0,0,0, 0x84000,       RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, true,  FIRST_RX_PSN+87, 39, 0x00, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 17c", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+200, 0, 39, 0,0,0, 0x84000,       RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, false, 0,               0,  0x00, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 17d", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+88,  0, 39, 0,0,0, 0x84100,       RKEY, 64,        0x00000000, buildWritePayload(64,0x1D),   true,  true,  FIRST_RX_PSN+88, 40, 0x00, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 17e", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+201, 0, 40, 0,0,0, 0x84000,       RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, true,  FIRST_RX_PSN+89, 40, 0x60, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 17f", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+89,  0, 40, 0,0,0, 0x84200,       RKEY, 64,        0x00000000, buildWritePayload(64,0x1E),   true,  true,  FIRST_RX_PSN+89, 41, 0x00, DRAIN}),
+        // out-of-window packets are dropped silently whatever BTH.a; the duplicate and in-order packets around them are unaffected
+        WRITE_TC({"MRC WRITE ONLY 17a", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+300, 0, 39, 0,0,0, 0x84000,       RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, false, 0,               0,  0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 17b", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+54,  0, 38, 0,0,0, 0x84000,       RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, true,  FIRST_RX_PSN+54, 37, 0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 17c", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+300, 0, 39, 0,0,0, 0x84000,       RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, false, 0,               0,  0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 17d", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+55,  0, 39, 0,0,0, 0x84100,       RKEY, 64,        0x00000000, buildWritePayload(64,0x1D),   true,  true,  FIRST_RX_PSN+55, 38, 0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 17e", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+301, 0, 40, 0,0,0, 0x84000,       RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, false, 0,               0,  0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 17f", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+56,  0, 40, 0,0,0, 0x84200,       RKEY, 64,        0x00000000, buildWritePayload(64,0x1E),   true,  true,  FIRST_RX_PSN+56, 39, 0x00, DRAIN}),
 
-        // duplicates. CURRENT BEHAVIOUR: ACKed even with BTH.a = 0; a duplicate MIDDLE is ACKed like an ONLY
-        WRITE_TC({"MRC WRITE ONLY 18a", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+89, 0, 40, 0,0,0, 0x84200,        RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, true, FIRST_RX_PSN+89, 41, 0x00, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 18b", MRC_RDMA_WRITE_MIDDLE, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+46, 0, 34, 0,0,0, 0x81000+PMTU,   RKEY, 2*PMTU+30, 0x00000000, buildWritePayload(PMTU,0xEE), false, true, FIRST_RX_PSN+46, 41, 0x00, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 18c", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+90, 0, 41, 0,0,0, 0x85000,        RKEY, 64,        0x00000000, buildWritePayload(64,0x1F),   true,  true, FIRST_RX_PSN+90, 42, 0x00, DRAIN}),
+        // duplicates are ACKed with the current cack_psn whatever BTH.a and opcode, and never rewritten
+        WRITE_TC({"MRC WRITE ONLY 18a", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+56, 0, 40, 0,0,0, 0x84200,        RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, true, FIRST_RX_PSN+56, 39, 0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 18b", MRC_RDMA_WRITE_MIDDLE, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+46, 0, 34, 0,0,0, 0x81000+PMTU,   RKEY, 2*PMTU+30, 0x00000000, buildWritePayload(PMTU,0xEE), false, true, FIRST_RX_PSN+56, 39, 0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 18c", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+57, 0, 41, 0,0,0, 0x85000,        RKEY, 64,        0x00000000, buildWritePayload(64,0x1F),   true,  true, FIRST_RX_PSN+57, 40, 0x00, DRAIN}),
 
         // QP 0x06 (epsn 0xFFFFFE): multi-packet write in order across the 24-bit wrap, then a duplicate behind the wrap
         WRITE_TC({"MRC WRITE ONLY 19a", MRC_RDMA_WRITE_FIRST,  0xFFFF, RSP_QP_1, 1,0,0,0, 0xFFFFFE, 0, 0, 0,0,0, 0x70000,        RKEY, 2*PMTU+20, 0x00000000, buildWritePayload(PMTU,0x21), true,  true, 0xFFFFFE, 0, 0x00, BACK_TO_BACK}),
         WRITE_TC({"MRC WRITE ONLY 19b", MRC_RDMA_WRITE_MIDDLE, 0xFFFF, RSP_QP_1, 1,0,0,0, 0xFFFFFF, 0, 0, 0,0,0, 0x70000+PMTU,   RKEY, 2*PMTU+20, 0x00000000, buildWritePayload(PMTU,0x22), true,  true, 0xFFFFFF, 0, 0x00, BACK_TO_BACK}),
         WRITE_TC({"MRC WRITE ONLY 19c", MRC_RDMA_WRITE_LAST,   0xFFFF, RSP_QP_1, 1,0,0,0, 0x000000, 0, 0, 0,0,0, 0x70000+2*PMTU, RKEY, 2*PMTU+20, 0x00000000, buildWritePayload(20,0x23),   true,  true, 0x000000, 1, 0x00, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 19d", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_1, 1,0,0,0, 0xFFFFFF, 0, 0, 0,0,0, 0x71000,        RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, true, 0xFFFFFF, 1, 0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE ONLY 19d", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_1, 1,0,0,0, 0xFFFFFF, 0, 0, 0,0,0, 0x71000,        RKEY, 64,        0x00000000, buildWritePayload(64,0xEE),   false, true, 0x000000, 1, 0x00, BACK_TO_BACK}),
         WRITE_TC({"MRC WRITE ONLY 19e", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_1, 1,0,0,0, 0x000001, 0, 1, 0,0,0, 0x71100,        RKEY, 64,        0x00000000, buildWritePayload(64,0x24),   true,  true, 0x000001, 2, 0x00, DRAIN}),
 
         // QP 0x07 (epsn 0xFFFFFB): ahead by 7 ACROSS the wrap. Expected = same behaviour as 15a (accepted).
-        WRITE_TC({"MRC WRITE ONLY 20a", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_2, 1,0,0,0, 0x000002, 0, 0, 0,0,0, 0x78000,        RKEY, 64,        0x00000000, buildWritePayload(64,0x25),   true,  true, 0x000002, 1, 0x00, DRAIN}),
-        
+        // QP 0x0A (epsn 0xFFFFFB): ahead by 7 ACROSS the wrap: written, ACK request pending until 0xFFFFFB..0x000001 arrive
+        WRITE_TC({"MRC WRITE ONLY 20a", MRC_RDMA_WRITE_ONLY,   0xFFFF, RSP_QP_2, 1,0,0,0, 0x000002, 0, 0, 0,0,0, 0x78000,        RKEY, 64,        0x00000000, buildWritePayload(64,0x25),   true,  false, 0, 0, 0x00, DRAIN}),
+                
         // RESPONDER SIDE
     };
 } // namespace

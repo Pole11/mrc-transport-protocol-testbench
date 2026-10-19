@@ -9,9 +9,7 @@
 #include "util.hpp"
 
 #include "axi_utils.hpp"
-#include "ib_transport_protocol/ib_transport_protocol.hpp"
 #include "ib_transport_protocol/ib_transport_protocol_impl.hpp"
-#include "ib_transport_protocol/mrc_headers.hpp"
 
 // this module must output
 // 1. process BTH (extract opcode, partition key, destination QP, psn, and so on)
@@ -59,11 +57,11 @@ namespace
 #endif
         hls::stream<net_axis<DATA_WIDTH> > input;
     
-        hls::stream<ibhMeta> metaToIbhFsmOut;              	// data path only (requests)
-        hls::stream<mrcEthMeta> metaToStripCtrlOut;        	// data path only, you only need to know if it has METH and TSETH
-        hls::stream<mrcCtrlBthMeta> metaToProcCtrlOut;   	// control path only, you must have all the possible information of BTH needed for ctrl
-        hls::stream<bool> isCtrlDataOut;            // every packet, true = control
-        hls::stream<bool> isCtrlUdpOut;             // every packet, true = control
+        hls::stream<ibhMeta> metaToIbhFsmOut;           // data path only (requests), to rx_ibh_fsm, contains op_code, partition_key, dest_qp, psn, ...
+        hls::stream<mrcEthMeta> metaToStripCtrlOut;     // data path only, you only need to know if it has METH and TSETH, to rx_strip_mrc_eth, contains op_code and ts (bool saying if it has tseth with timestamp or not)
+        hls::stream<mrcCtrlBthMeta> metaToProcCtrlOut;  // control path only, you must have all the possible information of BTH needed for ctrl, to rx_process_ctrl, contains op_code, partition_key, dest_qp, psn, ackReq, rtx
+        hls::stream<bool> isCtrlDataOut;                // every packet, true = control
+        hls::stream<bool> isCtrlUdpOut;                 // every packet, true = control
         hls::stream<net_axis<DATA_WIDTH> > forwardInputOut;
         ap_uint<32>		regIbvCountRx;
     
@@ -136,8 +134,9 @@ namespace
         }
         if (expDataMetas && !tb.metaToStripCtrlOut.empty()) {
             const mrcEthMeta m = tb.metaToStripCtrlOut.read();
-            expect("mrcEthMeta.op_code", m.op_code, tc.exp_metaToStripCtrlOut.op_code);
-            expect("mrcEthMeta.ts",      m.ts,      tc.exp_metaToStripCtrlOut.ts);
+            const mrcEthMeta& e = tc.exp_metaToStripCtrlOut;
+            expect("mrcEthMeta.op_code", m.op_code, e.op_code);
+            expect("mrcEthMeta.ts",      m.ts,      e.ts);
         }
 
         // control path metadata: one mrcCtrlBthMeta for a control packet, none for a request
