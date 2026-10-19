@@ -10,7 +10,7 @@
 #include "tests.hpp"
 
 #include "axi_utils.hpp"
-#include "ib_transport_protocol/ib_transport_protocol_impl.hpp"
+#include "mrc_transport_protocol/rx/rx_data_res.hpp"
 
 // it receives data packets and strips the mrc headers (can be variable in size and their presence optional)
 // they can either be 4 or 8 bytes

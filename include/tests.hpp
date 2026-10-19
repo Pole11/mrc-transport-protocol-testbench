@@ -1,7 +1,7 @@
 #pragma once
 
 // integration
-int runIbTransportProtocolTest();   // src/integration/dut_ib_transport_protocol.cpp
+int runIbTransportProtocolTest();   // src/integration/dut_mrc_transport_protocol.cpp
 
 // unit
 int runRxProcessIbhTest();          // src/unit/dut_rx_process_ibh.cpp

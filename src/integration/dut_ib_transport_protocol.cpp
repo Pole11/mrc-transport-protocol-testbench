@@ -10,8 +10,8 @@
 #include "tests.hpp"
 
 #include "axi_utils.hpp"
-#include "ib_transport_protocol/ib_transport_protocol.hpp"
-#include "ib_transport_protocol/mrc_headers.hpp"
+#include "mrc_transport_protocol/mrc_transport_protocol.hpp"
+#include "mrc_transport_protocol/mrc_headers.hpp"
 
 // todo: also add send queues and receive queues
 
@@ -29,7 +29,7 @@ namespace
 
     #define VERY_BIG_NUMBER 1000
 
-    #define IB_TRANSPORT_PROTOCOL_INSTID 0
+    #define mrc_transport_protocol_INSTID 0
 
     // local QPs acting as responder (send writes)
     #define RSP_QP_0 0x08   // write 1
@@ -337,7 +337,7 @@ namespace
                 }
             }
 
-            ib_transport_protocol<DATA_WIDTH, IB_TRANSPORT_PROTOCOL_INSTID>(
+            mrc_transport_protocol<DATA_WIDTH, mrc_transport_protocol_INSTID>(
                 rx_meta, rx_data,
                 tx_meta, tx_data,
                 sq_meta,

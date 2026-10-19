@@ -1,10 +1,11 @@
 XILINX_HLS ?= /tools/Xilinx/Vitis_HLS/2022.1
-NETSTACK   := ../Coyote-mrc/hw/services/network/hls # change me
+# change me
+NETSTACK   := ../Coyote-mrc/hw/services/network/hls
 
 SRCS := $(wildcard src/*/*.cpp) \
         $(wildcard src/*.cpp) \
-        $(NETSTACK)/ib_transport_protocol/ib_transport_protocol.cpp \
-        $(NETSTACK)/ib_transport_protocol/ib_utils.cpp \
+        $(NETSTACK)/mrc_transport_protocol/mrc_transport_protocol.cpp \
+        $(NETSTACK)/mrc_transport_protocol/ib_utils.cpp \
         $(NETSTACK)/axi_utils.cpp
 
 INCS := -Iinclude -I$(NETSTACK) -I$(XILINX_HLS)/include

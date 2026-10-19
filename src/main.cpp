@@ -12,9 +12,9 @@ int main()
     const int runRxIbhFsmTestResult = runRxIbhFsmTest();
 
     if (ibTransportProtocolTestResult == 0)
-        std::cout << "[PASS] ib_transport_protocol test\n";
+        std::cout << "[PASS] mrc_transport_protocol test\n";
     else
-        std::cerr << "[FAIL] ib_transport_protocol test\n";
+        std::cerr << "[FAIL] mrc_transport_protocol test\n";
 
     if (rxProcessIbhTestResult == 0)
         std::cout << "[PASS] rx_process_ibh test\n";

@@ -10,7 +10,7 @@
 #include "tests.hpp"
 
 #include "axi_utils.hpp"
-#include "ib_transport_protocol/ib_transport_protocol_impl.hpp"
+#include "mrc_transport_protocol/rx/rx_common.hpp"
 
 // this module must output the input ipUdpMeta (remote address, remote port, local port, length)
 // 1. to dataOut if splitIn = False
@@ -18,7 +18,7 @@
 
 namespace 
 {
-    #define RX_SPLIT_UDP_META_INSTID 2 // own instance (ib_transport_protocol uses 0 and 1)
+    #define RX_SPLIT_UDP_META_INSTID 2 // own instance (mrc_transport_protocol uses 0 and 1)
 
     struct SplitIpUdpMetaTestCase 
     {

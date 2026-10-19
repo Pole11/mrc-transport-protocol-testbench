@@ -10,7 +10,7 @@
 #include "tests.hpp"
 
 #include "axi_utils.hpp"
-#include "ib_transport_protocol/ib_transport_protocol_impl.hpp"
+#include "mrc_transport_protocol/rx/rx_common.hpp"
 
 // this module must output
 // 1. process BTH (extract opcode, partition key, destination QP, psn, and so on)
