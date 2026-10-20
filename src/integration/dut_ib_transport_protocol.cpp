@@ -896,7 +896,10 @@ namespace
         WRITE_TC({"MRC WRITE ONLY 15a", MRC_RDMA_WRITE_MIDDLE, 0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+53, 0, 36, 0,0,0, 0x86000+PMTU,   RKEY, 2*PMTU+50,  0x00000000, buildWritePayload(PMTU,0x40), true,  false, 0,               0,  0x00, BACK_TO_BACK}),
         WRITE_TC({"MRC WRITE ONLY 15b", MRC_RDMA_WRITE_MIDDLE, 0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+50, 0, 35, 0,0,0, 0x82000+2*PMTU, RKEY, 3*PMTU+100, 0x00000000, buildWritePayload(PMTU,0x41), true,  false, 0,               0,  0x00, BACK_TO_BACK}),
         WRITE_TC({"MRC WRITE ONLY 15c", MRC_RDMA_WRITE_LAST,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+54, 0, 36, 0,0,0, 0x86000+2*PMTU, RKEY, 2*PMTU+50,  0x00000000, buildWritePayload(50,0x42),   true,  false, 0,               0,  0x00, BACK_TO_BACK}),
-        WRITE_TC({"MRC WRITE ONLY 15d", MRC_RDMA_WRITE_FIRST,  0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+48, 0, 35, 0,0,0, 0x82000,        RKEY, 3*PMTU+100, 0x00000000, buildWritePayload(PMTU,0x43), true,  false, 0,               0,  0x00, BACK_TO_BACK}),
+        // for ackmap
+        //WRITE_TC({"MRC WRITE ONLY 15d", MRC_RDMA_WRITE_FIRST,  0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+48, 0, 35, 0,0,0, 0x82000,        RKEY, 3*PMTU+100, 0x00000000, buildWritePayload(PMTU,0x43), true,  false, 0,               0,  0x00, BACK_TO_BACK}),
+        // for prevAr
+        WRITE_TC({"MRC WRITE ONLY 15d", MRC_RDMA_WRITE_FIRST,  0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+48, 0, 35, 0,0,0, 0x82000,        RKEY, 3*PMTU+100, 0x00000000, buildWritePayload(PMTU,0x43), true,  true,  FIRST_RX_PSN+48, 35, 0x00, BACK_TO_BACK}),
         WRITE_TC({"MRC WRITE ONLY 15e", MRC_RDMA_WRITE_LAST,   0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+51, 0, 35, 0,0,0, 0x82000+3*PMTU, RKEY, 3*PMTU+100, 0x00000000, buildWritePayload(100,0x44),  true,  false, 0,               0,  0x00, BACK_TO_BACK}),
         WRITE_TC({"MRC WRITE ONLY 15f", MRC_RDMA_WRITE_FIRST,  0xFFFF, RSP_QP_0, 0,0,0,0, FIRST_RX_PSN+52, 0, 36, 0,0,0, 0x86000,        RKEY, 2*PMTU+50,  0x00000000, buildWritePayload(PMTU,0x45), true,  false, 0,               0,  0x00, BACK_TO_BACK}),
         WRITE_TC({"MRC WRITE ONLY 15g", MRC_RDMA_WRITE_MIDDLE, 0xFFFF, RSP_QP_0, 1,0,0,0, FIRST_RX_PSN+53, 0, 36, 0,0,0, 0x86000+PMTU,   RKEY, 2*PMTU+50,  0x00000000, buildWritePayload(PMTU,0xEE), false, true,  FIRST_RX_PSN+48, 35, 0x00, BACK_TO_BACK}),
