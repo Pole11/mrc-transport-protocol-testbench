@@ -16,9 +16,9 @@
 // it receives:
 // 1. metadata          (op_code, partition_key, dest_qp, psn, validPSN, numPkg, ackReq, rtx, ts, msnInc, cack)
 // 2. exhMetaFifo       (numPkg) <-- probably it can be removed
-// 3. stateTable_rsp    (epsn, oldest_outstanding_psn (is it useful?), max_forward (is it useful?), retryCounter, bitmap, lastmap, (ackmap) prevAr)
+// 3. stateTable_rsp    (epsn, oldest_outstanding_psn (is it useful?), max_forward (is it useful?), retryCounter, bitmap, lastmap, ackmap or prevAr)
 // it outputs:
-// 1. stateTable_upd_req        (qpn, epsn, retryCounter, isResponse, write, bitmap, lastmap, (ackmap) prevAr)
+// 1. stateTable_upd_req        (qpn, epsn, retryCounter, isResponse, write, bitmap, lastmap, ackmap or prevAr)
 // 2. metaOut                   (op_code, partition_key, dest_qp, psn, validPSN, numPkg, ackReq, rtx, ts, msnInc, cack)
 // 3. ibhEventFifo              (qpn, psn, validPsn, isNak)
 // 4. ibhDropFifo
@@ -52,7 +52,7 @@ namespace
         bool prevAr;
 
         // expected: state table
-        bool exp_read;              // false = cache hit, no read request
+        //bool exp_read;              // false = cache hit, no read request
         bool exp_write;             // only accepted packets update the state
         uint32_t exp_epsn;
         ap_uint<MRC_MPR> exp_bitmap;
@@ -91,7 +91,7 @@ namespace
         hls::stream<ackEvent>       ibhEventFifo;
         hls::stream<bool>           ibhDropFifo;
         hls::stream<fwdPolicy>      ibhDropMetaFifo;
-        hls::stream<ap_uint<16> >   stateTableInv;
+        //hls::stream<ap_uint<16> >   stateTableInv;
         ap_uint<32>                 regInvalidPsnDropCount = 0;
 
         // the bench is the state table: it answers reads and applies writes, like state_table does
@@ -113,7 +113,7 @@ namespace
                 ibhEventFifo,
                 ibhDropFifo,
                 ibhDropMetaFifo,
-                stateTableInv,
+                //stateTableInv,
                 regInvalidPsnDropCount
             );
 #ifdef DBG_IBV
@@ -165,7 +165,8 @@ namespace
         };
 
         // state table: one read on a cache miss, none on a hit; one write for an accepted packet
-        expect("state table reads",  tb.reads,         tc.exp_read ? 1 : 0);
+        //expect("state table reads",  tb.reads,         tc.exp_read ? 1 : 0);
+        expect("state table reads",  tb.reads,         1);
         expect("state table writes", tb.writes.size(), tc.exp_write ? 1 : 0);
         if (tc.exp_write && !tb.writes.empty()) {
             const rxStateReq& w = tb.writes[0];
@@ -283,46 +284,47 @@ namespace
         // Cache should be cleared on QP setup
         {"IBH FSM 23 QP setup clears cache", MRC_RDMA_WRITE_ONLY,     0xFFFF, 4, 0x2000, 1,0,0, true, 0x2000, 0, 0, 0,  true,  true,  0x2001, 0, 0, 0,                 true,  1, true,  0x2000,  false, 0,       false, false, false, 6},
         */
+        /* those are the ones for prevAr */
         // QP 1 (epsn 0x100): in order. The first packet is a cache miss, the next ones hit
-        {"IBH FSM 01 in order ONLY a",       MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x100, 1,0,0, true,  0x100, 0, 0, false,   true,  true,  0x101, 0, 0, false,                 true,  1, true,  0x100,   false, 0,       false, false, false, 0},
-        {"IBH FSM 02 in order ONLY",         MRC_RDMA_WRITE_ONLY,     0x1234, 1, 0x101, 0,1,1, false, 0,     0, 0, false,   false, true,  0x102, 0, 0, false,                 true,  1, false, 0x101,   false, 0,       false, false, false, 0},
+        {"IBH FSM 01 in order ONLY a",       MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x100, 1,0,0, true,  0x100, 0, 0, false,   /*true,*/  true,  0x101, 0, 0, false,                 true,  1, true,  0x100,   false, 0,       false, false, false, 0},
+        {"IBH FSM 02 in order ONLY",         MRC_RDMA_WRITE_ONLY,     0x1234, 1, 0x101, 0,1,1, false, 0,     0, 0, false,   /*false,*/ true,  0x102, 0, 0, false,                 true,  1, false, 0x101,   false, 0,       false, false, false, 0},
 
         // out of order inside the window: 0x105 LAST a, 0x103 FIRST, 0x104 MIDDLE, then 0x102 fills the hole
-        {"IBH FSM 03 ahead +3 LAST a",       MRC_RDMA_WRITE_LAST,     0xFFFF, 1, 0x105, 1,0,0, false, 0,     0, 0, false,   false, true,  0x102, BIT(3), BIT(3), true,      true,  0, false, 0x101,   false, 0,       false, false, false, 0},
-        {"IBH FSM 04 ahead +1 FIRST",        MRC_RDMA_WRITE_FIRST,    0xFFFF, 1, 0x103, 0,0,0, false, 0,     0, 0, false,   false, true,  0x102, BIT(3)|BIT(1), BIT(3), true, true,  0, false, 0x101, false, 0,       false, false, false, 0},
-        {"IBH FSM 05 ahead +2 MIDDLE",       MRC_RDMA_WRITE_MIDDLE,   0xFFFF, 1, 0x104, 0,0,0, false, 0,     0, 0, false,   false, true,  0x102, BIT(3)|BIT(2)|BIT(1), BIT(3), true, true, 0, false, 0x101, false, 0, false, false, false, 0},
-        {"IBH FSM 06 duplicate in window",   MRC_RDMA_WRITE_MIDDLE,   0xFFFF, 1, 0x104, 1,0,0, false, 0,     0, 0, false,   false, false, 0,     0, 0, false,                 false, 0, false, 0,       true,  0x101,   true,  false, true,  1},
-        {"IBH FSM 07 hole filled",           MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x102, 0,0,0, false, 0,     0, 0, false,   false, true,  0x106, 0, 0, false,                 true,  2, true,  0x105,   false, 0,       false, false, false, 1},
+        {"IBH FSM 03 ahead +3 LAST a",       MRC_RDMA_WRITE_LAST,     0xFFFF, 1, 0x105, 1,0,0, false, 0,     0, 0, false,   /*false,*/ true,  0x102, BIT(3), BIT(3), true,      true,  0, false, 0x101,   false, 0,       false, false, false, 0},
+        {"IBH FSM 04 ahead +1 FIRST",        MRC_RDMA_WRITE_FIRST,    0xFFFF, 1, 0x103, 0,0,0, false, 0,     0, 0, false,   /*false,*/ true,  0x102, BIT(3)|BIT(1), BIT(3), true, true,  0, false, 0x101, false, 0,       false, false, false, 0},
+        {"IBH FSM 05 ahead +2 MIDDLE",       MRC_RDMA_WRITE_MIDDLE,   0xFFFF, 1, 0x104, 0,0,0, false, 0,     0, 0, false,   /*false,*/ true,  0x102, BIT(3)|BIT(2)|BIT(1), BIT(3), true, true, 0, false, 0x101, false, 0, false, false, false, 0},
+        {"IBH FSM 06 duplicate in window",   MRC_RDMA_WRITE_MIDDLE,   0xFFFF, 1, 0x104, 1,0,0, false, 0,     0, 0, false,   /*false,*/ false, 0,     0, 0, false,             false, 0, false, 0,       true,  0x101,   true,  false, true,  1},
+        {"IBH FSM 07 hole filled",           MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x102, 0,0,0, false, 0,     0, 0, false,   /*false,*/ true,  0x106, 0, 0, false,             true,  2, true,  0x105,   false, 0,       false, false, false, 1},
 
         // behind epsn, and window edges (epsn 0x106)
-        {"IBH FSM 08 behind by 1",           MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x105, 1,0,0, false, 0,     0, 0, false,   false, false, 0,     0, 0, false,                 false, 0, false, 0,       true,  0x105,   true,  false, true,  2},
-        {"IBH FSM 09 far behind",            MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x000006, 1,0,0, false, 0,  0, 0, false,   false, false, 0,     0, 0, false,                 false, 0, false, 0,       true,  0x105,   true,  false, true,  3},
-        {"IBH FSM 10 epsn + 128",            MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x186, 1,0,0, false, 0,     0, 0, false,   false, false, 0,     0, 0, false,                 false, 0, false, 0,       false, 0,       true,  true,  false, 4},
-        {"IBH FSM 11 far ahead",             MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x500000, 1,0,0, false, 0,  0, 0, false,   false, false, 0,     0, 0, false,                 false, 0, false, 0,       false, 0,       true,  true,  false, 5},
-        {"IBH FSM 12 epsn + 127 ONLY a",     MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x185, 1,0,0, false, 0,     0, 0, false,   false, true,  0x106, BIT(127), BIT(127), true,  true,  0, false, 0x105,   false, 0,       false, false, false, 5},
+        {"IBH FSM 08 behind by 1",           MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x105, 1,0,0, false, 0,     0, 0, false,   /*false,*/ false, 0,     0, 0, false,             false, 0, false, 0,       true,  0x105,   true,  false, true,  2},
+        {"IBH FSM 09 far behind",            MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x000006, 1,0,0, false, 0,  0, 0, false,   /*false,*/ false, 0,     0, 0, false,             false, 0, false, 0,       true,  0x105,   true,  false, true,  3},
+        {"IBH FSM 10 epsn + 128",            MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x186, 1,0,0, false, 0,     0, 0, false,   /*false,*/ false, 0,     0, 0, false,             false, 0, false, 0,       false, 0,       true,  true,  false, 4},
+        {"IBH FSM 11 far ahead",             MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x500000, 1,0,0, false, 0,  0, 0, false,   /*false,*/ false, 0,     0, 0, false,             false, 0, false, 0,       false, 0,       true,  true,  false, 5},
+        {"IBH FSM 12 epsn + 127 ONLY a",     MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x185, 1,0,0, false, 0,     0, 0, false,   /*false,*/ true,  0x106, BIT(127), BIT(127), true, true,  0, false, 0x105,   false, 0,       false, false, false, 5},
 
         // QP 2 (epsn 0x200): cache miss, then the IMM opcodes also count in msnInc
-        {"IBH FSM 13 QP2 miss ONLY a",       MRC_RDMA_WRITE_ONLY,     0xFFFF, 2, 0x200, 1,0,0, true,  0x200, 0, 0, false,   true,  true,  0x201, 0, 0, false,                 true,  1, true,  0x200,   false, 0,       false, false, false, 5},
-        {"IBH FSM 14 QP2 ONLY IMM",          MRC_RDMA_WRITE_ONLY_IMM, 0xFFFF, 2, 0x201, 0,0,0, false, 0,     0, 0, false,   false, true,  0x202, 0, 0, false,                 true,  1, false, 0x201,   false, 0,       false, false, false, 5},
-        {"IBH FSM 15 QP2 LAST IMM",          MRC_RDMA_WRITE_LAST_IMM, 0xFFFF, 2, 0x202, 0,0,0, false, 0,     0, 0, false,   false, true,  0x203, 0, 0, false,                 true,  1, false, 0x202,   false, 0,       false, false, false, 5},
+        {"IBH FSM 13 QP2 miss ONLY a",       MRC_RDMA_WRITE_ONLY,     0xFFFF, 2, 0x200, 1,0,0, true,  0x200, 0, 0, false,   /*true,*/  true,  0x201, 0, 0, false,             true,  1, true,  0x200,   false, 0,       false, false, false, 5},
+        {"IBH FSM 14 QP2 ONLY IMM",          MRC_RDMA_WRITE_ONLY_IMM, 0xFFFF, 2, 0x201, 0,0,0, false, 0,     0, 0, false,   /*false,*/ true,  0x202, 0, 0, false,             true,  1, false, 0x201,   false, 0,       false, false, false, 5},
+        {"IBH FSM 15 QP2 LAST IMM",          MRC_RDMA_WRITE_LAST_IMM, 0xFFFF, 2, 0x202, 0,0,0, false, 0,     0, 0, false,   /*false,*/ true,  0x203, 0, 0, false,             true,  1, false, 0x202,   false, 0,       false, false, false, 5},
 
         // back to QP 1: miss, its own state (bit 127 and prevAr from row 12) must come back from the state table
-        {"IBH FSM 16 QP1 miss again",        MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x106, 1,0,0, false, 0,     0, 0, false,   true,  true,  0x107, BIT(126), BIT(126), true,  true,  1, true,  0x106,   false, 0,       false, false, false, 5},
+        {"IBH FSM 16 QP1 miss again",        MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x106, 1,0,0, false, 0,     0, 0, false,   /*true,*/  true,  0x107, BIT(126), BIT(126), true, true,  1, true,  0x106,   false, 0,       false, false, false, 5},
         // the AR of 0x185 is still pending and cack advanced: ACK even though 0x185 is not covered yet
-        {"IBH FSM 17 QP1 hit",               MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x107, 0,0,0, false, 0,     0, 0, false,   false, true,  0x108, BIT(125), BIT(125), true,  true,  1, true,  0x107,   false, 0,       false, false, false, 5},
+        {"IBH FSM 17 QP1 hit",               MRC_RDMA_WRITE_ONLY,     0xFFFF, 1, 0x107, 0,0,0, false, 0,     0, 0, false,   /*false,*/ true,  0x108, BIT(125), BIT(125), true, true,  1, true,  0x107,   false, 0,       false, false, false, 5},
 
         // QP 3 (epsn 0xFFFFFE): out of order across the 24-bit wrap
-        {"IBH FSM 18 wrap +2",               MRC_RDMA_WRITE_ONLY,     0xFFFF, 3, 0x000000, 0,0,0, true, 0xFFFFFE, 0, 0, false, true, true, 0xFFFFFE, BIT(2), BIT(2), false,  true,  0, false, 0xFFFFFD, false, 0,      false, false, false, 5},
-        {"IBH FSM 19 wrap +1",               MRC_RDMA_WRITE_ONLY,     0xFFFF, 3, 0xFFFFFF, 0,0,0, false, 0,  0, 0, false,   false, true,  0xFFFFFE, BIT(2)|BIT(1), BIT(2)|BIT(1), false, true, 0, false, 0xFFFFFD, false, 0, false, false, false, 5},
-        {"IBH FSM 20 wrap hole filled",      MRC_RDMA_WRITE_ONLY,     0xFFFF, 3, 0xFFFFFE, 0,0,0, false, 0,  0, 0, false,   false, true,  0x000001, 0, 0, false,              true,  3, false, 0x000000, false, 0,      false, false, false, 5},
-        {"IBH FSM 21 wrap duplicate",        MRC_RDMA_WRITE_ONLY,     0xFFFF, 3, 0xFFFFFF, 0,0,0, false, 0,  0, 0, false,   false, false, 0,     0, 0, false,                 false, 0, false, 0,       true,  0x000000, true, false, true,  6},
+        {"IBH FSM 18 wrap +2",               MRC_RDMA_WRITE_ONLY,     0xFFFF, 3, 0x000000, 0,0,0, true, 0xFFFFFE, 0, 0, false, /*true,*/ true, 0xFFFFFE, BIT(2), BIT(2), false, true,  0, false, 0xFFFFFD, false, 0,      false, false, false, 5},
+        {"IBH FSM 19 wrap +1",               MRC_RDMA_WRITE_ONLY,     0xFFFF, 3, 0xFFFFFF, 0,0,0, false, 0,  0, 0, false,   /*false,*/ true,  0xFFFFFE, BIT(2)|BIT(1), BIT(2)|BIT(1), false, true, 0, false, 0xFFFFFD, false, 0, false, false, false, 5},
+        {"IBH FSM 20 wrap hole filled",      MRC_RDMA_WRITE_ONLY,     0xFFFF, 3, 0xFFFFFE, 0,0,0, false, 0,  0, 0, false,   /*false,*/ true,  0x000001, 0, 0, false,          true,  3, false, 0x000000, false, 0,      false, false, false, 5},
+        {"IBH FSM 21 wrap duplicate",        MRC_RDMA_WRITE_ONLY,     0xFFFF, 3, 0xFFFFFF, 0,0,0, false, 0,  0, 0, false,   /*false,*/ false, 0,     0, 0, false,             false, 0, false, 0,       true,  0x000000, true, false, true,  6},
 
         // QP 4 (epsn 0x1000, +1 ... +127 already arrived, all LAST, an AR among them set prevAr): +0 empties the whole window
-        {"IBH FSM 22 full window",           MRC_RDMA_WRITE_ONLY,     0xFFFF, 4, 0x1000, 0,0,0, true, 0x1000, ALL_BUT_0, ALL_BUT_0, true, true, true, 0x1080, 0, 0, false, true, 128, true, 0x107F, false, 0,      false, false, false, 6},
+        {"IBH FSM 22 full window",           MRC_RDMA_WRITE_ONLY,     0xFFFF, 4, 0x1000, 0,0,0, true, 0x1000, ALL_BUT_0, ALL_BUT_0, true, /*true,*/ true, 0x1080, 0, 0, false, true, 128, true, 0x107F, false, 0,      false, false, false, 6},
 
         // QP 4 is set up again while it is in the cache
         // Cache should be cleared on QP setup
-        {"IBH FSM 23 QP setup clears cache", MRC_RDMA_WRITE_ONLY,     0xFFFF, 4, 0x2000, 1,0,0, true, 0x2000, 0, 0, false,  true,  true,  0x2001, 0, 0, false,                 true,  1, true,  0x2000,  false, 0,       false, false, false, 6},
+        {"IBH FSM 23 QP setup clears cache", MRC_RDMA_WRITE_ONLY,     0xFFFF, 4, 0x2000, 1,0,0, true, 0x2000, 0, 0, false,  /*true,*/  true,  0x2001, 0, 0, false,             true,  1, true,  0x2000,  false, 0,       false, false, false, 6},
     };
 } // namespace
 
@@ -338,13 +340,13 @@ int runRxIbhFsmTest()
 
         if (tc.preload) {
             tb.stateTable[tc.dest_qp & 0xFFFF] = buildRxStateRsp(tc);
-            tb.stateTableInv.write(tc.dest_qp & 0xFFFF); // like state_table does on a QP setup
+            //tb.stateTableInv.write(tc.dest_qp & 0xFFFF); // like state_table does on a QP setup
         }
         tb.metaIn.write(buildIbhMeta(tc));
         tb.exhMetaFifo.write(exhMeta(1));
 
         // 5 is the number of cycles needed for every input to be processed (would be 4 without cache! Reason about it)
-        for (int c = 0; c < 5; ++c) tb.tickOneCycle(); // LOAD, PROCESS, spare
+        for (int c = 0; c < 4; ++c) tb.tickOneCycle(); // LOAD, PROCESS, spare
         failures += !checkIbhFsm(tb, tc);
     }
 

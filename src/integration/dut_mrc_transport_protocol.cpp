@@ -296,7 +296,7 @@ namespace
     TestCase ENDPOINT_REQ_TC(const EndpointReqTestCase& t) { TestCase c = TestCase(); c.kind = TestCaseKind::ENDPOINT_REQ; c.endpoint_req = t; return c; }
     TestCase ENDPOINT_RES_TC(const EndpointResTestCase& t) { TestCase c = TestCase(); c.kind = TestCaseKind::ENDPOINT_RES; c.endpoint_res = t; return c; }
 
-    struct IbTransportProtocolTestBench
+    struct MrcTransportProtocolTestBench
     {
         hls::stream<ipUdpMeta> rx_meta;
         hls::stream<net_axis<DATA_WIDTH> > rx_data;
@@ -320,42 +320,44 @@ namespace
         ap_uint<32> ibv_rx_count = 0;
         ap_uint<32> ibv_tx_count = 0;
 
-        void tickOneCycle()
-        {
-            // local memory for the requestor: every read command is answered right away with cmd.len zero bytes
-            while (!mem_read_cmd.empty()) {
-                const memCmd cmd = mem_read_cmd.read();
-                for (uint32_t byteIndex = 0; byteIndex < cmd.len; byteIndex += DATA_WIDTH / 8) {
-                    net_axis<DATA_WIDTH> word;
-                    word.data = 0;
-                    word.keep = 0;
-                    for (uint32_t bit = 0; bit < std::min<uint32_t>(DATA_WIDTH / 8, cmd.len - byteIndex); ++bit) word.keep[bit] = 1;
-                    word.last = byteIndex + DATA_WIDTH / 8 >= cmd.len;
-                    mem_read_data.write(word);
-                }
-            }
-
-            mrc_transport_protocol_top(
-                rx_meta, rx_data,
-                tx_meta, tx_data,
-                sq_meta,
-                rx_ack_meta,
-                mem_write_cmd, mem_read_cmd,
-                mem_write_data, mem_read_data,
-                qp_interface, qp_connection_interface,
-#ifdef DBG_IBV
-                debug_0, debug_1, debug_2,
-#endif
-                invalid_psn_drop_count, retransmit_count, ibv_rx_count, ibv_tx_count
-            );
-#ifdef DBG_IBV
-            psnPkg debug_packet;
-            while (!debug_0.empty()) debug_0.read(debug_packet);
-            while (!debug_1.empty()) debug_1.read(debug_packet);
-            while (!debug_2.empty()) debug_2.read(debug_packet);
-#endif
-        }
+        void tickOneCycle();
     };
+
+    void MrcTransportProtocolTestBench::tickOneCycle()
+    {
+        // local memory for the requestor: every read command is answered right away with cmd.len zero bytes
+        while (!mem_read_cmd.empty()) {
+            const memCmd cmd = mem_read_cmd.read();
+            for (uint32_t byteIndex = 0; byteIndex < cmd.len; byteIndex += DATA_WIDTH / 8) {
+                net_axis<DATA_WIDTH> word;
+                word.data = 0;
+                word.keep = 0;
+                for (uint32_t bit = 0; bit < std::min<uint32_t>(DATA_WIDTH / 8, cmd.len - byteIndex); ++bit) word.keep[bit] = 1;
+                word.last = byteIndex + DATA_WIDTH / 8 >= cmd.len;
+                mem_read_data.write(word);
+            }
+        }
+
+        mrc_transport_protocol_top(
+            rx_meta, rx_data,
+            tx_meta, tx_data,
+            sq_meta,
+            rx_ack_meta,
+            mem_write_cmd, mem_read_cmd,
+            mem_write_data, mem_read_data,
+            qp_interface, qp_connection_interface,
+#ifdef DBG_IBV
+            debug_0, debug_1, debug_2,
+#endif
+            invalid_psn_drop_count, retransmit_count, ibv_rx_count, ibv_tx_count
+        );
+#ifdef DBG_IBV
+        psnPkg debug_packet;
+        while (!debug_0.empty()) debug_0.read(debug_packet);
+        while (!debug_1.empty()) debug_1.read(debug_packet);
+        while (!debug_2.empty()) debug_2.read(debug_packet);
+#endif
+    }
 
     std::vector<uint8_t> buildWritePacket(const WriteTestCase& testCase)
     {
@@ -547,7 +549,7 @@ namespace
         return packet;
     }
 
-    bool checkWriteProcessed(IbTransportProtocolTestBench& tb, const WriteTestCase& tc)
+    bool checkWriteProcessed(MrcTransportProtocolTestBench& tb, const WriteTestCase& tc)
     {
         bool returnValue = true;
         auto fail = [&](const std::string& msg) {
@@ -647,7 +649,7 @@ namespace
         return returnValue;
     }
 
-    bool checkAckProcessed(IbTransportProtocolTestBench& tb, const AckTestCase& tc) 
+    bool checkAckProcessed(MrcTransportProtocolTestBench& tb, const AckTestCase& tc) 
     {
         bool returnValue = true;
         auto fail = [&](const std::string& msg) {
@@ -672,14 +674,14 @@ namespace
         return returnValue;
     }
 
-    bool checkSackProcessed(IbTransportProtocolTestBench& tb, const SackTestCase& tc) 
+    bool checkSackProcessed(MrcTransportProtocolTestBench& tb, const SackTestCase& tc) 
     {
         // a SACK never produces output (no completion, no packet, no memory access): it only moves unack_psn,
         // which the NACK rows after it observe. Anything it emits by mistake is reported as leftover at the end of the group
         return true;
     }
 
-    bool checkNackProcessed(IbTransportProtocolTestBench& tb, const NackTestCase& tc) 
+    bool checkNackProcessed(MrcTransportProtocolTestBench& tb, const NackTestCase& tc) 
     {
         bool returnValue = true;
         auto fail = [&](const std::string& msg) {
@@ -713,19 +715,19 @@ namespace
         return returnValue;
     }
 
-    bool checkProbeProcessed(IbTransportProtocolTestBench& tb, const ProbeTestCase& tc) 
+    bool checkProbeProcessed(MrcTransportProtocolTestBench& tb, const ProbeTestCase& tc) 
     {
         // CURRENT BEHAVIOUR: parsed and logged only (the SACK response with pr = 1 is a TODO), so it owns no output
         return true;
     }
 
-    bool checkEndpointReqProcessed(IbTransportProtocolTestBench& tb, const EndpointReqTestCase& tc) 
+    bool checkEndpointReqProcessed(MrcTransportProtocolTestBench& tb, const EndpointReqTestCase& tc) 
     {
         // CURRENT BEHAVIOUR: parsed and logged only (the EETH response to an EV probe is a TODO), so it owns no output
         return true;
     }
 
-    bool checkEndpointResProcessed(IbTransportProtocolTestBench& tb, const EndpointResTestCase& tc) 
+    bool checkEndpointResProcessed(MrcTransportProtocolTestBench& tb, const EndpointResTestCase& tc) 
     {
         // CURRENT BEHAVIOUR: parsed and logged only (latency measurement is a TODO), so it owns no output
         return true;
@@ -937,9 +939,9 @@ namespace
     };
 } // namespace
 
-int runIbTransportProtocolTest()
+int runMrcTransportProtocolTest()
 {
-    IbTransportProtocolTestBench tb;
+    MrcTransportProtocolTestBench tb;
 
     tb.qp_interface.write(qpContext(READY_RECV, RSP_QP_0, 0x100, FIRST_RX_PSN, RKEY, 0x70000));
     tb.qp_connection_interface.write(ifConnReq(RSP_QP_0, REMOTE_QPN, REMOTE_IP, REMOTE_UDP_PORT));

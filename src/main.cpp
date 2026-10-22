@@ -4,14 +4,14 @@
 
 int main()
 {
-    const int ibTransportProtocolTestResult = runIbTransportProtocolTest();
+    const int mrcTransportProtocolTestResult = runMrcTransportProtocolTest();
     const int rxProcessIbhTestResult = runRxProcessIbhTest();
     const int runSplitIpUdpMetaTestResult = runSplitIpUdpMetaTest();
     const int runSplitCtrlTestResult = runSplitCtrlTest();
     const int runStripMrcEthTestResult = runStripMrcEthTest();
     const int runRxIbhFsmTestResult = runRxIbhFsmTest();
 
-    if (ibTransportProtocolTestResult == 0)
+    if (mrcTransportProtocolTestResult == 0)
         std::cout << "[PASS] mrc_transport_protocol test\n";
     else
         std::cerr << "[FAIL] mrc_transport_protocol test\n";
@@ -42,7 +42,7 @@ int main()
         std::cerr << "[FAIL] rx_ibh_fsm test\n";
 
 
-    return ibTransportProtocolTestResult || 
+    return mrcTransportProtocolTestResult || 
         rxProcessIbhTestResult || 
         runSplitIpUdpMetaTestResult || 
         runSplitCtrlTestResult ||
