@@ -10,6 +10,7 @@ int main()
     const int runSplitCtrlTestResult = runSplitCtrlTest();
     const int runStripMrcEthTestResult = runStripMrcEthTest();
     const int runRxIbhFsmTestResult = runRxIbhFsmTest();
+    const int runRxProcessExhTestResult = runRxProcessExhTest();
 
     if (mrcTransportProtocolTestResult == 0)
         std::cout << "[PASS] mrc_transport_protocol test\n";
@@ -41,11 +42,17 @@ int main()
     else
         std::cerr << "[FAIL] rx_ibh_fsm test\n";
 
+    if (runRxProcessExhTestResult == 0)
+        std::cout << "[PASS] rx_process_exh test\n";
+    else
+        std::cerr << "[FAIL] rx_process_exh test\n";
+
 
     return mrcTransportProtocolTestResult || 
         rxProcessIbhTestResult || 
         runSplitIpUdpMetaTestResult || 
         runSplitCtrlTestResult ||
         runStripMrcEthTestResult ||
-        runRxIbhFsmTestResult;
+        runRxIbhFsmTestResult ||
+        runRxProcessExhTestResult;
 }

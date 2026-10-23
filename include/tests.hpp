@@ -9,3 +9,4 @@ int runSplitIpUdpMetaTest();        // src/unit/dut_rx_split_udp_meta.cpp
 int runSplitCtrlTest();             // src/unit/dut_rx_split_ctrl.cpp
 int runStripMrcEthTest();           // src/unit/dut_rx_strip_mrc_eth.cpp
 int runRxIbhFsmTest();              // src/unit/dut_rx_ibh_fsm.cpp
+int runRxProcessExhTest();          // src/unit/dut_rx_process_exh.cpp
