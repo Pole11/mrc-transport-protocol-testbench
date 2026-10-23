@@ -11,6 +11,8 @@ int main()
     const int runStripMrcEthTestResult = runStripMrcEthTest();
     const int runRxIbhFsmTestResult = runRxIbhFsmTest();
     const int runRxProcessExhTestResult = runRxProcessExhTest();
+    const int runRxProcessCtrlTestResult = runRxProcessCtrlTest();
+    const int runIpUdpMetaHandlerTestResult = runIpUdpMetaHandlerTest();
 
     if (mrcTransportProtocolTestResult == 0)
         std::cout << "[PASS] mrc_transport_protocol test\n";
@@ -47,6 +49,15 @@ int main()
     else
         std::cerr << "[FAIL] rx_process_exh test\n";
 
+    if (runRxProcessCtrlTestResult == 0)
+        std::cout << "[PASS] rx_process_ctrl test\n";
+    else
+        std::cerr << "[FAIL] rx_process_ctrl test\n";
+
+    if (runIpUdpMetaHandlerTestResult == 0)
+        std::cout << "[PASS] ipUdpMetaHandler test\n";
+    else
+        std::cerr << "[FAIL] ipUdpMetaHandler test\n";
 
     return mrcTransportProtocolTestResult || 
         rxProcessIbhTestResult || 
@@ -54,5 +65,7 @@ int main()
         runSplitCtrlTestResult ||
         runStripMrcEthTestResult ||
         runRxIbhFsmTestResult ||
-        runRxProcessExhTestResult;
+        runRxProcessExhTestResult ||
+        runRxProcessCtrlTestResult || 
+        runIpUdpMetaHandlerTestResult;
 }

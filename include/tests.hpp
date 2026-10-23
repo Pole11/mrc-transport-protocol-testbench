@@ -10,3 +10,5 @@ int runSplitCtrlTest();             // src/unit/dut_rx_split_ctrl.cpp
 int runStripMrcEthTest();           // src/unit/dut_rx_strip_mrc_eth.cpp
 int runRxIbhFsmTest();              // src/unit/dut_rx_ibh_fsm.cpp
 int runRxProcessExhTest();          // src/unit/dut_rx_process_exh.cpp
+int runRxProcessCtrlTest();         // src/unit/dut_rx_process_ctrl.cpp
+int runIpUdpMetaHandlerTest();      // src/unit/dut_ip_udp_meta_handler.cpp
