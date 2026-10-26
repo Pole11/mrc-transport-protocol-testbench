@@ -49,6 +49,7 @@ namespace
         hls::stream<bool>      splitIn;
 
         hls::stream<ipUdpMeta> dataOut;
+        hls::stream<ap_uint<16> > dataLenOut;
         hls::stream<ipUdpMeta> ctrlOut;
 
         void tickOneCycle() 
@@ -57,6 +58,7 @@ namespace
                 input,
                 splitIn,
                 dataOut,
+                dataLenOut,
                 ctrlOut
             );
         }
@@ -82,8 +84,9 @@ namespace
         const size_t expData = tc.splitIn ? 0 : 1;
         const size_t expCtrl = tc.splitIn ? 1 : 0;
         if (tb.dataOut.size() != expData) fail("dataOut: expected " + std::to_string(expData) + " meta, got " + std::to_string(tb.dataOut.size()));
+        if (tb.dataLenOut.size() != expData) fail("dataLenOut: expected " + std::to_string(expData) + " length, got " + std::to_string(tb.dataLenOut.size()));
         if (tb.ctrlOut.size() != expCtrl) fail("ctrlOut: expected " + std::to_string(expCtrl) + " meta, got " + std::to_string(tb.ctrlOut.size()));
-
+        
         // the meta is forwarded unchanged
         if (expData && !tb.dataOut.empty()) {
             const ipUdpMeta m = tb.dataOut.read();
@@ -92,6 +95,8 @@ namespace
             expect("dataOut.my_port",       m.my_port,       tc.exp_data_my_port);
             expect("dataOut.length",        m.length,        tc.exp_data_length);
         }
+        if (expData && !tb.dataLenOut.empty())
+            expect("dataLenOut",            tb.dataLenOut.read(), tc.exp_data_length);
         if (expCtrl && !tb.ctrlOut.empty()) {
             const ipUdpMeta m = tb.ctrlOut.read();
             expect("ctrlOut.their_address", m.their_address, tc.exp_ctrl_their_address);
@@ -105,10 +110,11 @@ namespace
         if (!tb.splitIn.empty()) fail("splitIn flag not consumed");
 
         // whatever is left (wrong counts above) must not leak into the next test case
-        while (!tb.dataOut.empty()) tb.dataOut.read();
-        while (!tb.ctrlOut.empty()) tb.ctrlOut.read();
-        while (!tb.input.empty())   tb.input.read();
-        while (!tb.splitIn.empty()) tb.splitIn.read();
+        while (!tb.dataOut.empty())     tb.dataOut.read();
+        while (!tb.dataLenOut.empty())  tb.dataLenOut.read();
+        while (!tb.ctrlOut.empty())     tb.ctrlOut.read();
+        while (!tb.input.empty())       tb.input.read();
+        while (!tb.splitIn.empty())     tb.splitIn.read();
 
         return returnValue;
     }
