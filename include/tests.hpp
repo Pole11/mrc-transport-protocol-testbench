@@ -12,3 +12,4 @@ int runRxIbhFsmTest();              // src/unit/dut_rx_ibh_fsm.cpp
 int runRxProcessExhTest();          // src/unit/dut_rx_process_exh.cpp
 int runRxProcessCtrlTest();         // src/unit/dut_rx_process_ctrl.cpp
 int runIpUdpMetaHandlerTest();      // src/unit/dut_ip_udp_meta_handler.cpp
+int runStateTableTest();            // src/unit/dut_state_table.cpp

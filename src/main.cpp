@@ -13,6 +13,7 @@ int main()
     const int runRxProcessExhTestResult = runRxProcessExhTest();
     const int runRxProcessCtrlTestResult = runRxProcessCtrlTest();
     const int runIpUdpMetaHandlerTestResult = runIpUdpMetaHandlerTest();
+    const int runStateTableTestResult = runStateTableTest();
 
     if (mrcTransportProtocolTestResult == 0)
         std::cout << "[PASS] mrc_transport_protocol test\n";
@@ -59,6 +60,11 @@ int main()
     else
         std::cerr << "[FAIL] ipUdpMetaHandler test\n";
 
+    if (runStateTableTestResult == 0)
+        std::cout << "[PASS] state_table test\n";
+    else
+        std::cerr << "[FAIL] state_table test\n";
+
     return mrcTransportProtocolTestResult || 
         rxProcessIbhTestResult || 
         runSplitIpUdpMetaTestResult || 
@@ -67,5 +73,6 @@ int main()
         runRxIbhFsmTestResult ||
         runRxProcessExhTestResult ||
         runRxProcessCtrlTestResult || 
-        runIpUdpMetaHandlerTestResult;
+        runIpUdpMetaHandlerTestResult ||
+        runStateTableTestResult;
 }

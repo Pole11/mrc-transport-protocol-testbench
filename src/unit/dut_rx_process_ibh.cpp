@@ -10,7 +10,7 @@
 #include "tests.hpp"
 
 #include "axi_utils.hpp"
-#include "mrc_transport_protocol/rx/rx_common.hpp"
+#include "mrc_transport_protocol/rx/rx_process_ibh.hpp"
 
 // this module must output
 // 1. process BTH (extract opcode, partition key, destination QP, psn, and so on)
@@ -203,7 +203,8 @@ namespace
         // control packet with every flag set (ts is not carried on the control path) and a payload longer than one word
         {"IBH 14 NACK flags",     MRC_NACK,                0xABCD, 0xFFFFFF, 1,1,1,1, 0xFFFFFF, 200,  ibhMeta(), mrcEthMeta(), mrcCtrlBthMeta(MRC_NACK,      0xABCD, 0xFFFFFF, 0xFFFFFF, true,  true),  true, true, 14},
 
-        // CURRENT BEHAVIOUR: any opcode that is not MRC control (here RC RDMA WRITE ONLY 0x0A) goes to the data path
+        // any opcode that is not MRC control (here RC RDMA WRITE ONLY 0x0A) 
+        // CURRENT BEHAVIOUR: goes to the data path
         {"IBH 15 RC opcode",      0x0A,                    0xFFFF, 0x000005, 1,0,0,0, 0x0A0B04, 64,   ibhMeta((mrcOpCode)0x0A,         0xFFFF, 0x000005, 0x0A0B04, true, true,  false, false), mrcEthMeta((mrcOpCode)0x0A,         false), mrcCtrlBthMeta(), false, false, 15},
 
         // back to a request after control packets: the parser restarted cleanly at every last

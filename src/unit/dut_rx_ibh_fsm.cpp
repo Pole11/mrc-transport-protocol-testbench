@@ -11,7 +11,7 @@
 #include "tests.hpp"
 
 #include "axi_utils.hpp"
-#include "mrc_transport_protocol/rx/rx_data_res.hpp"
+#include "mrc_transport_protocol/rx/rx_ibh_fsm.hpp"
 
 // it receives:
 // 1. metadata          (op_code, partition_key, dest_qp, psn, validPSN, numPkg, ackReq, rtx, ts, msnInc, cack)

@@ -10,7 +10,7 @@
 #include "tests.hpp"
 
 #include "axi_utils.hpp"
-#include "mrc_transport_protocol/rx/rx_common.hpp"
+#include "mrc_transport_protocol/rx/rx_split_udp_meta.hpp"
 
 // this module must output the input ipUdpMeta (remote address, remote port, local port, length)
 // 1. to dataOut if splitIn = False

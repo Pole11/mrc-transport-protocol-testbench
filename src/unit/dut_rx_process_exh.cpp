@@ -11,7 +11,7 @@
 #include "tests.hpp"
 
 #include "axi_utils.hpp"
-#include "mrc_transport_protocol/rx/rx_data_res.hpp"
+#include "mrc_transport_protocol/rx/rx_process_exh.hpp"
 
 // it receives:
 // 1. input         packets that starts with RETH

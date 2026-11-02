@@ -10,7 +10,7 @@
 #include "tests.hpp"
 
 #include "axi_utils.hpp"
-#include "mrc_transport_protocol/rx/rx_data_res.hpp"
+#include "mrc_transport_protocol/rx/ipUdpMetaHandler.hpp"
 
 // it receives (one of each per data packet, it waits for all three):
 // 1. input             ipUdpMeta of the packet (their_address, their_port, my_port, length)

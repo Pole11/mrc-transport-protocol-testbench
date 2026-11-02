@@ -10,7 +10,7 @@
 #include "tests.hpp"
 
 #include "axi_utils.hpp"
-#include "mrc_transport_protocol/rx/rx_common.hpp"
+#include "mrc_transport_protocol/rx/rx_split_ctrl.hpp"
 
 // this module must output every word of the input packet (the bytes after the BTH), unchanged
 // 1. to dataOut if splitIn = False

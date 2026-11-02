@@ -10,7 +10,7 @@
 #include "tests.hpp"
 
 #include "axi_utils.hpp"
-#include "mrc_transport_protocol/rx/rx_ctrl.hpp"
+#include "mrc_transport_protocol/rx/rx_process_ctrl.hpp"
 
 // it receives:
 // 1. input         control packets after the BTH (AETH, SETH + CC_STATE, NETH, PETH, ERTH, EETH)
