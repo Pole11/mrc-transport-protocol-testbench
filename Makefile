@@ -6,7 +6,8 @@ DUT_SRCS := $(NETSTACK)/mrc_transport_protocol/mrc_transport_protocol.cpp \
             $(NETSTACK)/mrc_transport_protocol/ib_utils.cpp \
             $(NETSTACK)/axi_utils.cpp
 
-SRCS := $(wildcard src/*/*.cpp) \
+SRCS := $(wildcard src/*/*/*.cpp) \
+		$(wildcard src/*/*.cpp) \
         $(wildcard src/*.cpp) \
         $(DUT_SRCS)
 

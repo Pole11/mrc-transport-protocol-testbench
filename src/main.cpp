@@ -14,6 +14,8 @@ int main()
     const int runRxProcessCtrlTestResult = runRxProcessCtrlTest();
     const int runIpUdpMetaHandlerTestResult = runIpUdpMetaHandlerTest();
     const int runStateTableTestResult = runStateTableTest();
+    const int runMergeRxPkgsTestResult = runMergeRxPkgsTest();
+    const int runRxExhPayloadTestResult = runRxExhPayloadTest();
 
     if (mrcTransportProtocolTestResult == 0)
         std::cout << "[PASS] mrc_transport_protocol test\n";
@@ -65,6 +67,16 @@ int main()
     else
         std::cerr << "[FAIL] state_table test\n";
 
+    if (runMergeRxPkgsTestResult == 0)
+        std::cout << "[PASS] merge_rx_pkgs test\n";
+    else
+        std::cerr << "[FAIL] merge_rx_pkgs test\n";
+
+    if (runRxExhPayloadTestResult == 0)
+        std::cout << "[PASS] rx_exh_payload test\n";
+    else
+        std::cerr << "[FAIL] rx_exh_payload test\n";
+
     return mrcTransportProtocolTestResult || 
         rxProcessIbhTestResult || 
         runSplitIpUdpMetaTestResult || 
@@ -74,5 +86,7 @@ int main()
         runRxProcessExhTestResult ||
         runRxProcessCtrlTestResult || 
         runIpUdpMetaHandlerTestResult ||
-        runStateTableTestResult;
+        runStateTableTestResult ||
+        runMergeRxPkgsTestResult ||
+        runRxExhPayloadTestResult;
 }
