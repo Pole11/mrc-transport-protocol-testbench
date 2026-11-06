@@ -23,7 +23,7 @@ HLS        = mkdir -p $(HLS_DIR) && cd $(HLS_DIR) && \
              TB_DIR=$(CURDIR) NETSTACK=$(abspath $(NETSTACK)) TARGETS="$(TARGETS)" STEP=$(1) \
              $(VITIS_HLS) -f $(CURDIR)/hls.tcl -l $(1).log
 
-main: $(SRCS) $(wildcard include/*.hpp)
+main: $(SRCS) $(wildcard include/*.hpp) $(wildcard $(NETSTACK)/mrc_transport_protocol/*.hpp $(NETSTACK)/mrc_transport_protocol/*/*.hpp)
 	g++ -std=c++14 -O1 -w $(INCS) $(SRCS) -o $@
 
 run: main

@@ -514,6 +514,13 @@ namespace
         WRITE_TC({"MRC WRITE ZERO 23a", MRC_RDMA_WRITE_ONLY,    0xFFFF, RSP_QP_3, 1,0,0,0, FIRST_RX_PSN_3+10,  0, 6, 0,0,0, 0x96000,      RKEY, 0,       0x00000000, buildWritePayload(0,0x00),    true,  true,  FIRST_RX_PSN_3+10, 7, 0x00, BACK_TO_BACK}),
         WRITE_TC({"MRC WRITE ZERO 23b", MRC_RDMA_WRITE_ONLY,    0xFFFF, RSP_QP_3, 1,0,0,0, FIRST_RX_PSN_3+11,  0, 7, 0,0,0, 0x96100,      RKEY, 64,      0x00000000, buildWritePayload(64,0x51),   true,  true,  FIRST_RX_PSN_3+11, 8, 0x00, DRAIN}),
         
+        // padding (BTH.PadCnt): payloads of 4n+3 bytes (pad 1) and 4n+2 bytes (pad 2) on ONLY, ONLY_IMM with TSETH and LAST_IMM.
+        // The pad bytes are counted in the UDP length but must not reach the memory
+        WRITE_TC({"MRC WRITE PAD 24a", MRC_RDMA_WRITE_ONLY_IMM, 0xFFFF, RSP_QP_3, 1,0,0,1, FIRST_RX_PSN_3+12, 4, 8, 0x1234,0,1, 0x97000,      RKEY, 63,     0xA1B2C3D4, buildWritePayload(63,0x61),   true,  true,  FIRST_RX_PSN_3+12, 9,  0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE PAD 24b", MRC_RDMA_WRITE_FIRST,    0xFFFF, RSP_QP_3, 1,0,0,0, FIRST_RX_PSN_3+13, 5, 9, 0,0,0,      0x98000,      RKEY, PMTU+2, 0x00000000, buildWritePayload(PMTU,0x62), true,  true,  FIRST_RX_PSN_3+13, 9,  0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE PAD 24c", MRC_RDMA_WRITE_LAST_IMM, 0xFFFF, RSP_QP_3, 1,0,0,0, FIRST_RX_PSN_3+14, 5, 9, 0,0,0,      0x98000+PMTU, RKEY, PMTU+2, 0x5A5A5A5A, buildWritePayload(2,0x63),    true,  true,  FIRST_RX_PSN_3+14, 10, 0x00, BACK_TO_BACK}),
+        WRITE_TC({"MRC WRITE PAD 24d", MRC_RDMA_WRITE_ONLY,     0xFFFF, RSP_QP_3, 1,0,0,0, FIRST_RX_PSN_3+15, 0, 10, 0,0,0,     0x99000,      RKEY, 3,      0x00000000, buildWritePayload(3,0x64),    true,  true,  FIRST_RX_PSN_3+15, 11, 0x00, DRAIN}),
+        
         // RESPONDER SIDE
     };
 }
