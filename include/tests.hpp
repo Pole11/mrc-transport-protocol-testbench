@@ -14,5 +14,6 @@ int runRxProcessCtrlTest();         // src/unit/rx/dut_rx_process_ctrl.cpp
 int runIpUdpMetaHandlerTest();      // src/unit/rx/dut_ip_udp_meta_handler.cpp
 int runMergeRxPkgsTest();           // src/unit/rx/dut_merge_rx_pkgs.cpp
 int runRxExhPayloadTest();          // src/unit/rx/dut_rx_exh_payload.cpp
+int runDropOooIbhTest();            // src/unit/rx/dut_drop_ooo_ibh.cpp
 
 int runStateTableTest();            // src/unit/tables/dut_state_table.cpp

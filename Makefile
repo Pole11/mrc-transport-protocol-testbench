@@ -1,6 +1,6 @@
 XILINX_HLS ?= /tools/Xilinx/Vitis_HLS/2022.1
 # change me
-NETSTACK   ?= ../Coyote-mrc/hw/services/network/hls
+NETSTACK   ?= ../Coyote/hw/services/network/hls
 
 DUT_SRCS := $(NETSTACK)/mrc_transport_protocol/mrc_transport_protocol.cpp \
             $(NETSTACK)/mrc_transport_protocol/ib_utils.cpp \
