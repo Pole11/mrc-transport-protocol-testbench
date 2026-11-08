@@ -184,31 +184,63 @@ namespace
     // exp_regIbvCountRx counts every packet since the start of the test, so the rows must stay in this order.
     const BthTestCase bthTestCases[] = {
         // requests: every MRC write opcode, flags one at a time, packets of 1, 2 and many words
-        {"IBH 01 WRITE ONLY",     MRC_RDMA_WRITE_ONLY,     0xFFFF, 0x000005, 1,0,0,0, 0x0A0B00, 64,   ibhMeta(MRC_RDMA_WRITE_ONLY,     0xFFFF, 0x000005, 0x0A0B00, true, true,  false, false), mrcEthMeta(MRC_RDMA_WRITE_ONLY,     false), mrcCtrlBthMeta(), false, false, 1},
-        {"IBH 02 WRITE FIRST ts", MRC_RDMA_WRITE_FIRST,    0xFFFF, 0x000005, 1,0,0,1, 0x0A0B01, 1024, ibhMeta(MRC_RDMA_WRITE_FIRST,    0xFFFF, 0x000005, 0x0A0B01, true, true,  false, true),  mrcEthMeta(MRC_RDMA_WRITE_FIRST,    true),  mrcCtrlBthMeta(), false, false, 2},
-        {"IBH 03 WRITE MIDDLE",   MRC_RDMA_WRITE_MIDDLE,   0xFFFF, 0x000005, 0,0,1,0, 0x0A0B02, 1024, ibhMeta(MRC_RDMA_WRITE_MIDDLE,   0xFFFF, 0x000005, 0x0A0B02, true, false, true,  false), mrcEthMeta(MRC_RDMA_WRITE_MIDDLE,   false), mrcCtrlBthMeta(), false, false, 3},
-        {"IBH 04 WRITE LAST R",   MRC_RDMA_WRITE_LAST,     0x1234, 0x000005, 1,1,0,0, 0x0A0B03, 100,  ibhMeta(MRC_RDMA_WRITE_LAST,     0x1234, 0x000005, 0x0A0B03, true, true,  false, false), mrcEthMeta(MRC_RDMA_WRITE_LAST,     false), mrcCtrlBthMeta(), false, false, 4},
-        {"IBH 05 WRITE LAST IMM", MRC_RDMA_WRITE_LAST_IMM, 0xFFFF, 0x000006, 1,0,0,1, 0x000000, 52,   ibhMeta(MRC_RDMA_WRITE_LAST_IMM, 0xFFFF, 0x000006, 0x000000, true, true,  false, true),  mrcEthMeta(MRC_RDMA_WRITE_LAST_IMM, true),  mrcCtrlBthMeta(), false, false, 5},
-        {"IBH 06 WRITE ONLY IMM", MRC_RDMA_WRITE_ONLY_IMM, 0x0000, 0xFFFFFF, 1,1,1,1, 0xFFFFFF, 53,   ibhMeta(MRC_RDMA_WRITE_ONLY_IMM, 0x0000, 0xFFFFFF, 0xFFFFFF, true, true,  true,  true),  mrcEthMeta(MRC_RDMA_WRITE_ONLY_IMM, true),  mrcCtrlBthMeta(), false, false, 6},
-        {"IBH 07 BTH only",       MRC_RDMA_WRITE_ONLY,     0xFFFF, 0x123456, 0,0,0,0, 0x654321, 0,    ibhMeta(MRC_RDMA_WRITE_ONLY,     0xFFFF, 0x123456, 0x654321, true, false, false, false), mrcEthMeta(MRC_RDMA_WRITE_ONLY,     false), mrcCtrlBthMeta(), false, false, 7},
+        {.name = "IBH 01 WRITE ONLY", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = 0x000005, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = 0x0A0B00,
+         .payload_len = 64,
+         .exp_metaToIbhFsmOut = ibhMeta(MRC_RDMA_WRITE_ONLY, 0xFFFF, 0x000005, 0x0A0B00, true, true, false, false), .exp_metaToStripCtrlOut = mrcEthMeta(MRC_RDMA_WRITE_ONLY, false), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(), .exp_isCtrlDataOut = false, .exp_isCtrlUdpOut = false, .exp_regIbvCountRx = 1},
+        {.name = "IBH 02 WRITE FIRST ts", .opcode = MRC_RDMA_WRITE_FIRST, .p_key = 0xFFFF, .dqp = 0x000005, .a = 1, .R = 0, .rtx = 0, .ts = 1, .psn = 0x0A0B01,
+         .payload_len = 1024,
+         .exp_metaToIbhFsmOut = ibhMeta(MRC_RDMA_WRITE_FIRST, 0xFFFF, 0x000005, 0x0A0B01, true, true, false, true), .exp_metaToStripCtrlOut = mrcEthMeta(MRC_RDMA_WRITE_FIRST, true), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(), .exp_isCtrlDataOut = false, .exp_isCtrlUdpOut = false, .exp_regIbvCountRx = 2},
+        {.name = "IBH 03 WRITE MIDDLE", .opcode = MRC_RDMA_WRITE_MIDDLE, .p_key = 0xFFFF, .dqp = 0x000005, .a = 0, .R = 0, .rtx = 1, .ts = 0, .psn = 0x0A0B02,
+         .payload_len = 1024,
+         .exp_metaToIbhFsmOut = ibhMeta(MRC_RDMA_WRITE_MIDDLE, 0xFFFF, 0x000005, 0x0A0B02, true, false, true, false), .exp_metaToStripCtrlOut = mrcEthMeta(MRC_RDMA_WRITE_MIDDLE, false), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(), .exp_isCtrlDataOut = false, .exp_isCtrlUdpOut = false, .exp_regIbvCountRx = 3},
+        {.name = "IBH 04 WRITE LAST R", .opcode = MRC_RDMA_WRITE_LAST, .p_key = 0x1234, .dqp = 0x000005, .a = 1, .R = 1, .rtx = 0, .ts = 0, .psn = 0x0A0B03,
+         .payload_len = 100,
+         .exp_metaToIbhFsmOut = ibhMeta(MRC_RDMA_WRITE_LAST, 0x1234, 0x000005, 0x0A0B03, true, true, false, false), .exp_metaToStripCtrlOut = mrcEthMeta(MRC_RDMA_WRITE_LAST, false), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(), .exp_isCtrlDataOut = false, .exp_isCtrlUdpOut = false, .exp_regIbvCountRx = 4},
+        {.name = "IBH 05 WRITE LAST IMM", .opcode = MRC_RDMA_WRITE_LAST_IMM, .p_key = 0xFFFF, .dqp = 0x000006, .a = 1, .R = 0, .rtx = 0, .ts = 1, .psn = 0x000000,
+         .payload_len = 52,
+         .exp_metaToIbhFsmOut = ibhMeta(MRC_RDMA_WRITE_LAST_IMM, 0xFFFF, 0x000006, 0x000000, true, true, false, true), .exp_metaToStripCtrlOut = mrcEthMeta(MRC_RDMA_WRITE_LAST_IMM, true), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(), .exp_isCtrlDataOut = false, .exp_isCtrlUdpOut = false, .exp_regIbvCountRx = 5},
+        {.name = "IBH 06 WRITE ONLY IMM", .opcode = MRC_RDMA_WRITE_ONLY_IMM, .p_key = 0x0000, .dqp = 0xFFFFFF, .a = 1, .R = 1, .rtx = 1, .ts = 1, .psn = 0xFFFFFF,
+         .payload_len = 53,
+         .exp_metaToIbhFsmOut = ibhMeta(MRC_RDMA_WRITE_ONLY_IMM, 0x0000, 0xFFFFFF, 0xFFFFFF, true, true, true, true), .exp_metaToStripCtrlOut = mrcEthMeta(MRC_RDMA_WRITE_ONLY_IMM, true), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(), .exp_isCtrlDataOut = false, .exp_isCtrlUdpOut = false, .exp_regIbvCountRx = 6},
+        {.name = "IBH 07 BTH only", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = 0x123456, .a = 0, .R = 0, .rtx = 0, .ts = 0, .psn = 0x654321,
+         .payload_len = 0,
+         .exp_metaToIbhFsmOut = ibhMeta(MRC_RDMA_WRITE_ONLY, 0xFFFF, 0x123456, 0x654321, true, false, false, false), .exp_metaToStripCtrlOut = mrcEthMeta(MRC_RDMA_WRITE_ONLY, false), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(), .exp_isCtrlDataOut = false, .exp_isCtrlUdpOut = false, .exp_regIbvCountRx = 7},
 
         // control packets: every control opcode, header-sized payload (AETH 4, SETH+CC 36, NETH 20, PETH/ERTH 16, EETH 36)
-        {"IBH 08 ACK",            MRC_ACK,                 0xFFFF, 0x000008, 0,0,0,0, 0x000202, 4,    ibhMeta(), mrcEthMeta(), mrcCtrlBthMeta(MRC_ACK,       0xFFFF, 0x000008, 0x000202, false, false), true, true, 8},
-        {"IBH 09 SACK",           MRC_SACK,                0xFFFF, 0x000008, 0,0,0,0, 0x00ABCD, 36,   ibhMeta(), mrcEthMeta(), mrcCtrlBthMeta(MRC_SACK,      0xFFFF, 0x000008, 0x00ABCD, false, false), true, true, 9},
-        {"IBH 10 NACK",           MRC_NACK,                0xFFFF, 0x000009, 0,0,0,0, 0x000200, 20,   ibhMeta(), mrcEthMeta(), mrcCtrlBthMeta(MRC_NACK,      0xFFFF, 0x000009, 0x000200, false, false), true, true, 10},
-        {"IBH 11 PROBE",          MRC_PROBE_REQ,           0xFFFF, 0x000005, 0,0,0,0, 0x000000, 16,   ibhMeta(), mrcEthMeta(), mrcCtrlBthMeta(MRC_PROBE_REQ, 0xFFFF, 0x000005, 0x000000, false, false), true, true, 11},
-        {"IBH 12 EP REQ",         MRC_EP_REQ,              0xFFFF, 0x000002, 0,0,0,0, 0x003002, 16,   ibhMeta(), mrcEthMeta(), mrcCtrlBthMeta(MRC_EP_REQ,    0xFFFF, 0x000002, 0x003002, false, false), true, true, 12},
-        {"IBH 13 EP RES",         MRC_EP_RSP,              0xFFFF, 0x000002, 0,0,0,0, 0x003002, 36,   ibhMeta(), mrcEthMeta(), mrcCtrlBthMeta(MRC_EP_RSP,    0xFFFF, 0x000002, 0x003002, false, false), true, true, 13},
+        {.name = "IBH 08 ACK", .opcode = MRC_ACK, .p_key = 0xFFFF, .dqp = 0x000008, .a = 0, .R = 0, .rtx = 0, .ts = 0, .psn = 0x000202,
+         .payload_len = 4,
+         .exp_metaToIbhFsmOut = ibhMeta(), .exp_metaToStripCtrlOut = mrcEthMeta(), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(MRC_ACK, 0xFFFF, 0x000008, 0x000202, false, false), .exp_isCtrlDataOut = true, .exp_isCtrlUdpOut = true, .exp_regIbvCountRx = 8},
+        {.name = "IBH 09 SACK", .opcode = MRC_SACK, .p_key = 0xFFFF, .dqp = 0x000008, .a = 0, .R = 0, .rtx = 0, .ts = 0, .psn = 0x00ABCD,
+         .payload_len = 36,
+         .exp_metaToIbhFsmOut = ibhMeta(), .exp_metaToStripCtrlOut = mrcEthMeta(), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(MRC_SACK, 0xFFFF, 0x000008, 0x00ABCD, false, false), .exp_isCtrlDataOut = true, .exp_isCtrlUdpOut = true, .exp_regIbvCountRx = 9},
+        {.name = "IBH 10 NACK", .opcode = MRC_NACK, .p_key = 0xFFFF, .dqp = 0x000009, .a = 0, .R = 0, .rtx = 0, .ts = 0, .psn = 0x000200,
+         .payload_len = 20,
+         .exp_metaToIbhFsmOut = ibhMeta(), .exp_metaToStripCtrlOut = mrcEthMeta(), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(MRC_NACK, 0xFFFF, 0x000009, 0x000200, false, false), .exp_isCtrlDataOut = true, .exp_isCtrlUdpOut = true, .exp_regIbvCountRx = 10},
+        {.name = "IBH 11 PROBE", .opcode = MRC_PROBE_REQ, .p_key = 0xFFFF, .dqp = 0x000005, .a = 0, .R = 0, .rtx = 0, .ts = 0, .psn = 0x000000,
+         .payload_len = 16,
+         .exp_metaToIbhFsmOut = ibhMeta(), .exp_metaToStripCtrlOut = mrcEthMeta(), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(MRC_PROBE_REQ, 0xFFFF, 0x000005, 0x000000, false, false), .exp_isCtrlDataOut = true, .exp_isCtrlUdpOut = true, .exp_regIbvCountRx = 11},
+        {.name = "IBH 12 EP REQ", .opcode = MRC_EP_REQ, .p_key = 0xFFFF, .dqp = 0x000002, .a = 0, .R = 0, .rtx = 0, .ts = 0, .psn = 0x003002,
+         .payload_len = 16,
+         .exp_metaToIbhFsmOut = ibhMeta(), .exp_metaToStripCtrlOut = mrcEthMeta(), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(MRC_EP_REQ, 0xFFFF, 0x000002, 0x003002, false, false), .exp_isCtrlDataOut = true, .exp_isCtrlUdpOut = true, .exp_regIbvCountRx = 12},
+        {.name = "IBH 13 EP RES", .opcode = MRC_EP_RSP, .p_key = 0xFFFF, .dqp = 0x000002, .a = 0, .R = 0, .rtx = 0, .ts = 0, .psn = 0x003002,
+         .payload_len = 36,
+         .exp_metaToIbhFsmOut = ibhMeta(), .exp_metaToStripCtrlOut = mrcEthMeta(), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(MRC_EP_RSP, 0xFFFF, 0x000002, 0x003002, false, false), .exp_isCtrlDataOut = true, .exp_isCtrlUdpOut = true, .exp_regIbvCountRx = 13},
 
         // control packet with every flag set (ts is not carried on the control path) and a payload longer than one word
-        {"IBH 14 NACK flags",     MRC_NACK,                0xABCD, 0xFFFFFF, 1,1,1,1, 0xFFFFFF, 200,  ibhMeta(), mrcEthMeta(), mrcCtrlBthMeta(MRC_NACK,      0xABCD, 0xFFFFFF, 0xFFFFFF, true,  true),  true, true, 14},
+        {.name = "IBH 14 NACK flags", .opcode = MRC_NACK, .p_key = 0xABCD, .dqp = 0xFFFFFF, .a = 1, .R = 1, .rtx = 1, .ts = 1, .psn = 0xFFFFFF,
+         .payload_len = 200,
+         .exp_metaToIbhFsmOut = ibhMeta(), .exp_metaToStripCtrlOut = mrcEthMeta(), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(MRC_NACK, 0xABCD, 0xFFFFFF, 0xFFFFFF, true, true), .exp_isCtrlDataOut = true, .exp_isCtrlUdpOut = true, .exp_regIbvCountRx = 14},
 
         // any opcode that is not MRC control (here RC RDMA WRITE ONLY 0x0A) 
         // CURRENT BEHAVIOUR: goes to the data path
-        {"IBH 15 RC opcode",      0x0A,                    0xFFFF, 0x000005, 1,0,0,0, 0x0A0B04, 64,   ibhMeta((mrcOpCode)0x0A,         0xFFFF, 0x000005, 0x0A0B04, true, true,  false, false), mrcEthMeta((mrcOpCode)0x0A,         false), mrcCtrlBthMeta(), false, false, 15},
+        {.name = "IBH 15 RC opcode", .opcode = 0x0A, .p_key = 0xFFFF, .dqp = 0x000005, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = 0x0A0B04,
+         .payload_len = 64,
+         .exp_metaToIbhFsmOut = ibhMeta((mrcOpCode)0x0A, 0xFFFF, 0x000005, 0x0A0B04, true, true, false, false), .exp_metaToStripCtrlOut = mrcEthMeta((mrcOpCode)0x0A, false), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(), .exp_isCtrlDataOut = false, .exp_isCtrlUdpOut = false, .exp_regIbvCountRx = 15},
 
         // back to a request after control packets: the parser restarted cleanly at every last
-        {"IBH 16 WRITE ONLY",     MRC_RDMA_WRITE_ONLY,     0xFFFF, 0x000007, 0,0,1,1, 0x000002, 128,  ibhMeta(MRC_RDMA_WRITE_ONLY,     0xFFFF, 0x000007, 0x000002, true, false, true,  true),  mrcEthMeta(MRC_RDMA_WRITE_ONLY,     true),  mrcCtrlBthMeta(), false, false, 16},
+        {.name = "IBH 16 WRITE ONLY", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = 0x000007, .a = 0, .R = 0, .rtx = 1, .ts = 1, .psn = 0x000002,
+         .payload_len = 128,
+         .exp_metaToIbhFsmOut = ibhMeta(MRC_RDMA_WRITE_ONLY, 0xFFFF, 0x000007, 0x000002, true, false, true, true), .exp_metaToStripCtrlOut = mrcEthMeta(MRC_RDMA_WRITE_ONLY, true), .exp_metaToProcCtrlOut = mrcCtrlBthMeta(), .exp_isCtrlDataOut = false, .exp_isCtrlUdpOut = false, .exp_regIbvCountRx = 16},
     };
 
 }

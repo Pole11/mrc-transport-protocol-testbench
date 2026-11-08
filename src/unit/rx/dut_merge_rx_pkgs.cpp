@@ -108,60 +108,94 @@ namespace
     // so words taken from the wrong input, or from the next packet, cannot pass as the expected ones
     const MergeRxPkgsTestCase mergeRxPkgsTestCases[] = {
         // nothing to do
-        {"MERGE 01 no input",                           -1,             SHIFT_RETH,     0,    0x00, true,  3,  0,    0x00, false},
+        {.name = "MERGE 01 no input", .shift = -1, .fifo = SHIFT_RETH, .length = 0, .seed = 0x00, .last = true, .calls = 3,
+         .exp_length = 0, .exp_seed = 0x00, .exp_last = false},
 
         // every type forwards its own input (the cast to the state relies on the two enums being aligned)
-        {"MERGE 02 RETH 1 byte",                        SHIFT_RETH,     SHIFT_RETH,     1,    0x10, true,  2,  1,    0x10, true},
-        {"MERGE 03 RETH_IMM 1 byte",                    SHIFT_RETH_IMM, SHIFT_RETH_IMM, 1,    0x11, true,  2,  1,    0x11, true},
-        {"MERGE 04 NONE 1 byte",                        SHIFT_NONE,     SHIFT_NONE,     1,    0x12, true,  2,  1,    0x12, true},
+        {.name = "MERGE 02 RETH 1 byte", .shift = SHIFT_RETH, .fifo = SHIFT_RETH, .length = 1, .seed = 0x10, .last = true, .calls = 2,
+         .exp_length = 1, .exp_seed = 0x10, .exp_last = true},
+        {.name = "MERGE 03 RETH_IMM 1 byte", .shift = SHIFT_RETH_IMM, .fifo = SHIFT_RETH_IMM, .length = 1, .seed = 0x11, .last = true, .calls = 2,
+         .exp_length = 1, .exp_seed = 0x11, .exp_last = true},
+        {.name = "MERGE 04 NONE 1 byte", .shift = SHIFT_NONE, .fifo = SHIFT_NONE, .length = 1, .seed = 0x12, .last = true, .calls = 2,
+         .exp_length = 1, .exp_seed = 0x12, .exp_last = true},
 
         // sizes around the word boundary and long packets: the input is held for every word until last
-        {"MERGE 05 RETH 64 bytes",                      SHIFT_RETH,     SHIFT_RETH,     64,   0x20, true,  2,  64,   0x20, true},
-        {"MERGE 06 RETH_IMM 65 bytes",                  SHIFT_RETH_IMM, SHIFT_RETH_IMM, 65,   0x21, true,  3,  65,   0x21, true},
-        {"MERGE 07 NONE 128 bytes",                     SHIFT_NONE,     SHIFT_NONE,     128,  0x22, true,  3,  128,  0x22, true},
-        {"MERGE 08 RETH 256 bytes (WRITE ONLY 256)",    SHIFT_RETH,     SHIFT_RETH,     256,  0x30, true,  5,  256,  0x30, true},
-        {"MERGE 09 RETH_IMM PMTU",                      SHIFT_RETH_IMM, SHIFT_RETH_IMM, 4096, 0x40, true,  65, 4096, 0x40, true},
-        {"MERGE 10 NONE 1000 bytes",                    SHIFT_NONE,     SHIFT_NONE,     1000, 0x41, true,  17, 1000, 0x41, true},
+        {.name = "MERGE 05 RETH 64 bytes", .shift = SHIFT_RETH, .fifo = SHIFT_RETH, .length = 64, .seed = 0x20, .last = true, .calls = 2,
+         .exp_length = 64, .exp_seed = 0x20, .exp_last = true},
+        {.name = "MERGE 06 RETH_IMM 65 bytes", .shift = SHIFT_RETH_IMM, .fifo = SHIFT_RETH_IMM, .length = 65, .seed = 0x21, .last = true, .calls = 3,
+         .exp_length = 65, .exp_seed = 0x21, .exp_last = true},
+        {.name = "MERGE 07 NONE 128 bytes", .shift = SHIFT_NONE, .fifo = SHIFT_NONE, .length = 128, .seed = 0x22, .last = true, .calls = 3,
+         .exp_length = 128, .exp_seed = 0x22, .exp_last = true},
+        {.name = "MERGE 08 RETH 256 bytes (WRITE ONLY 256)", .shift = SHIFT_RETH, .fifo = SHIFT_RETH, .length = 256, .seed = 0x30, .last = true, .calls = 5,
+         .exp_length = 256, .exp_seed = 0x30, .exp_last = true},
+        {.name = "MERGE 09 RETH_IMM PMTU", .shift = SHIFT_RETH_IMM, .fifo = SHIFT_RETH_IMM, .length = 4096, .seed = 0x40, .last = true, .calls = 65,
+         .exp_length = 4096, .exp_seed = 0x40, .exp_last = true},
+        {.name = "MERGE 10 NONE 1000 bytes", .shift = SHIFT_NONE, .fifo = SHIFT_NONE, .length = 1000, .seed = 0x41, .last = true, .calls = 17,
+         .exp_length = 1000, .exp_seed = 0x41, .exp_last = true},
 
         // one word per call: after 2 calls only the first word is out, the rest follows without a new pkgShift
-        {"MERGE 11 RETH 192 bytes, 2 calls",            SHIFT_RETH,     SHIFT_RETH,     192,  0x50, true,  2,  64,   0x50, false},
-        {"MERGE 12 RETH remaining 2 words",             -1,             SHIFT_RETH,     0,    0x00, true,  2,  128,  0x90, true},
+        {.name = "MERGE 11 RETH 192 bytes, 2 calls", .shift = SHIFT_RETH, .fifo = SHIFT_RETH, .length = 192, .seed = 0x50, .last = true, .calls = 2,
+         .exp_length = 64, .exp_seed = 0x50, .exp_last = false},
+        {.name = "MERGE 12 RETH remaining 2 words", .shift = -1, .fifo = SHIFT_RETH, .length = 0, .seed = 0x00, .last = true, .calls = 2,
+         .exp_length = 128, .exp_seed = 0x90, .exp_last = true},
 
         // words before their pkgShift: they wait, nothing is forwarded without a pkgShift
-        {"MERGE 13 RETH words, no pkgShift",            -1,             SHIFT_RETH,     128,  0x60, true,  4,  0,    0x00, false},
-        {"MERGE 14 RETH pkgShift arrives",              SHIFT_RETH,     SHIFT_RETH,     0,    0x00, true,  3,  128,  0x60, true},
+        {.name = "MERGE 13 RETH words, no pkgShift", .shift = -1, .fifo = SHIFT_RETH, .length = 128, .seed = 0x60, .last = true, .calls = 4,
+         .exp_length = 0, .exp_seed = 0x00, .exp_last = false},
+        {.name = "MERGE 14 RETH pkgShift arrives", .shift = SHIFT_RETH, .fifo = SHIFT_RETH, .length = 0, .seed = 0x00, .last = true, .calls = 3,
+         .exp_length = 128, .exp_seed = 0x60, .exp_last = true},
 
         // pkgShift before its words: the ready packets on the other inputs are not taken while waiting
-        {"MERGE 15 RETH_IMM pkgShift, NONE words",      SHIFT_RETH_IMM, SHIFT_NONE,     64,   0x70, true,  4,  0,    0x00, false},
-        {"MERGE 16 RETH words too",                     -1,             SHIFT_RETH,     64,   0x71, true,  3,  0,    0x00, false},
+        {.name = "MERGE 15 RETH_IMM pkgShift, NONE words", .shift = SHIFT_RETH_IMM, .fifo = SHIFT_NONE, .length = 64, .seed = 0x70, .last = true, .calls = 4,
+         .exp_length = 0, .exp_seed = 0x00, .exp_last = false},
+        {.name = "MERGE 16 RETH words too", .shift = -1, .fifo = SHIFT_RETH, .length = 64, .seed = 0x71, .last = true, .calls = 3,
+         .exp_length = 0, .exp_seed = 0x00, .exp_last = false},
         // and a packet in progress is not interleaved: its words arrive with gaps, the others keep waiting
-        {"MERGE 17 RETH_IMM first word",                -1,             SHIFT_RETH_IMM, 64,   0x72, false, 1,  64,   0x72, false},
-        {"MERGE 18 RETH_IMM gap",                       -1,             SHIFT_RETH_IMM, 0,    0x00, true,  3,  0,    0x00, false},
-        {"MERGE 19 RETH_IMM last word",                 -1,             SHIFT_RETH_IMM, 10,   0xB2, true,  1,  10,   0xB2, true},
+        {.name = "MERGE 17 RETH_IMM first word", .shift = -1, .fifo = SHIFT_RETH_IMM, .length = 64, .seed = 0x72, .last = false, .calls = 1,
+         .exp_length = 64, .exp_seed = 0x72, .exp_last = false},
+        {.name = "MERGE 18 RETH_IMM gap", .shift = -1, .fifo = SHIFT_RETH_IMM, .length = 0, .seed = 0x00, .last = true, .calls = 3,
+         .exp_length = 0, .exp_seed = 0x00, .exp_last = false},
+        {.name = "MERGE 19 RETH_IMM last word", .shift = -1, .fifo = SHIFT_RETH_IMM, .length = 10, .seed = 0xB2, .last = true, .calls = 1,
+         .exp_length = 10, .exp_seed = 0xB2, .exp_last = true},
         // the order of the pkgShifts decides, not the order of the words
-        {"MERGE 20 RETH pkgShift, older NONE waits",    SHIFT_RETH,     SHIFT_RETH,     0,    0x00, true,  2,  64,   0x71, true},
-        {"MERGE 21 NONE pkgShift",                      SHIFT_NONE,     SHIFT_NONE,     0,    0x00, true,  2,  64,   0x70, true},
+        {.name = "MERGE 20 RETH pkgShift, older NONE waits", .shift = SHIFT_RETH, .fifo = SHIFT_RETH, .length = 0, .seed = 0x00, .last = true, .calls = 2,
+         .exp_length = 64, .exp_seed = 0x71, .exp_last = true},
+        {.name = "MERGE 21 NONE pkgShift", .shift = SHIFT_NONE, .fifo = SHIFT_NONE, .length = 0, .seed = 0x00, .last = true, .calls = 2,
+         .exp_length = 64, .exp_seed = 0x70, .exp_last = true},
 
         // last ends the packet even if the next one is already queued on the same input, the next pkgShift decides
-        {"MERGE 22 queue: RETH packet A",               -1,             SHIFT_RETH,     128,  0x80, true,  0,  0,    0x00, false},
-        {"MERGE 23 queue: RETH packet B",               -1,             SHIFT_RETH,     64,   0x05, true,  0,  0,    0x00, false},
-        {"MERGE 24 queue: RETH pkgShift, NONE packet",  SHIFT_RETH,     SHIFT_NONE,     64,   0xA0, true,  0,  0,    0x00, false},
-        {"MERGE 25 queue: NONE pkgShift, A out",        SHIFT_NONE,     SHIFT_NONE,     0,    0x00, true,  3,  128,  0x80, true},
-        {"MERGE 26 queue: NONE before B",               -1,             SHIFT_NONE,     0,    0x00, true,  2,  64,   0xA0, true},
-        {"MERGE 27 queue: RETH pkgShift, B out",        SHIFT_RETH,     SHIFT_RETH,     0,    0x00, true,  2,  64,   0x05, true},
+        {.name = "MERGE 22 queue: RETH packet A", .shift = -1, .fifo = SHIFT_RETH, .length = 128, .seed = 0x80, .last = true, .calls = 0,
+         .exp_length = 0, .exp_seed = 0x00, .exp_last = false},
+        {.name = "MERGE 23 queue: RETH packet B", .shift = -1, .fifo = SHIFT_RETH, .length = 64, .seed = 0x05, .last = true, .calls = 0,
+         .exp_length = 0, .exp_seed = 0x00, .exp_last = false},
+        {.name = "MERGE 24 queue: RETH pkgShift, NONE packet", .shift = SHIFT_RETH, .fifo = SHIFT_NONE, .length = 64, .seed = 0xA0, .last = true, .calls = 0,
+         .exp_length = 0, .exp_seed = 0x00, .exp_last = false},
+        {.name = "MERGE 25 queue: NONE pkgShift, A out", .shift = SHIFT_NONE, .fifo = SHIFT_NONE, .length = 0, .seed = 0x00, .last = true, .calls = 3,
+         .exp_length = 128, .exp_seed = 0x80, .exp_last = true},
+        {.name = "MERGE 26 queue: NONE before B", .shift = -1, .fifo = SHIFT_NONE, .length = 0, .seed = 0x00, .last = true, .calls = 2,
+         .exp_length = 64, .exp_seed = 0xA0, .exp_last = true},
+        {.name = "MERGE 27 queue: RETH pkgShift, B out", .shift = SHIFT_RETH, .fifo = SHIFT_RETH, .length = 0, .seed = 0x00, .last = true, .calls = 2,
+         .exp_length = 64, .exp_seed = 0x05, .exp_last = true},
 
         // a packet without pkgShift (rx_exh_payload routes it, rx_exh_fsm never writes its pkgShift) blocks no other input
-        {"MERGE 28 orphan NONE packet",                 -1,             SHIFT_NONE,     64,   0xD0, true,  2,  0,    0x00, false},
-        {"MERGE 29 RETH still flows",                   SHIFT_RETH,     SHIFT_RETH,     64,   0xD1, true,  2,  64,   0xD1, true},
-        {"MERGE 30 RETH_IMM still flows",               SHIFT_RETH_IMM, SHIFT_RETH_IMM, 100,  0xD2, true,  3,  100,  0xD2, true},
+        {.name = "MERGE 28 orphan NONE packet", .shift = -1, .fifo = SHIFT_NONE, .length = 64, .seed = 0xD0, .last = true, .calls = 2,
+         .exp_length = 0, .exp_seed = 0x00, .exp_last = false},
+        {.name = "MERGE 29 RETH still flows", .shift = SHIFT_RETH, .fifo = SHIFT_RETH, .length = 64, .seed = 0xD1, .last = true, .calls = 2,
+         .exp_length = 64, .exp_seed = 0xD1, .exp_last = true},
+        {.name = "MERGE 30 RETH_IMM still flows", .shift = SHIFT_RETH_IMM, .fifo = SHIFT_RETH_IMM, .length = 100, .seed = 0xD2, .last = true, .calls = 3,
+         .exp_length = 100, .exp_seed = 0xD2, .exp_last = true},
         // CURRENT BEHAVIOUR: the next SHIFT_NONE forwards the orphan, every later NONE packet is one pkgShift late
-        {"MERGE 31 NONE pkgShift takes the orphan",     SHIFT_NONE,     SHIFT_NONE,     64,   0xE0, true,  2,  64,   0xD0, true},
-        {"MERGE 32 NONE pkgShift takes the new one",    SHIFT_NONE,     SHIFT_NONE,     0,    0x00, true,  2,  64,   0xE0, true},
+        {.name = "MERGE 31 NONE pkgShift takes the orphan", .shift = SHIFT_NONE, .fifo = SHIFT_NONE, .length = 64, .seed = 0xE0, .last = true, .calls = 2,
+         .exp_length = 64, .exp_seed = 0xD0, .exp_last = true},
+        {.name = "MERGE 32 NONE pkgShift takes the new one", .shift = SHIFT_NONE, .fifo = SHIFT_NONE, .length = 0, .seed = 0x00, .last = true, .calls = 2,
+         .exp_length = 64, .exp_seed = 0xE0, .exp_last = true},
 
         // malformed: type 3 is outside pkgShiftType (it fits its 2 bits). CURRENT BEHAVIOUR: it is cast to IDLE,
         // the pkgShift is consumed and nothing is forwarded, the words wait for the next pkgShift
-        {"MERGE 33 pkgShift type 3",                    3,              SHIFT_RETH,     64,   0xF0, true,  3,  0,    0x00, false},
-        {"MERGE 34 RETH pkgShift after type 3",         SHIFT_RETH,     SHIFT_RETH,     0,    0x00, true,  2,  64,   0xF0, true},
+        {.name = "MERGE 33 pkgShift type 3", .shift = 3, .fifo = SHIFT_RETH, .length = 64, .seed = 0xF0, .last = true, .calls = 3,
+         .exp_length = 0, .exp_seed = 0x00, .exp_last = false},
+        {.name = "MERGE 34 RETH pkgShift after type 3", .shift = SHIFT_RETH, .fifo = SHIFT_RETH, .length = 0, .seed = 0x00, .last = true, .calls = 2,
+         .exp_length = 64, .exp_seed = 0xF0, .exp_last = true},
     };
 } // namespace
 

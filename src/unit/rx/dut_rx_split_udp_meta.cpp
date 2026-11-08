@@ -123,34 +123,54 @@ namespace
     // so a meta left over by a previous row cannot pass as this row's output
     const SplitIpUdpMetaTestCase splitIpUdpMetaTestCases[] = {
         // typical RoCE values: IPv4 peer in the low 32 bits, source port from the sender, local port 4791
-        {"SPLIT 01 data RoCE",          ap_uint<128>("0x0A000002"), 0xC000, 0x12B7, 1080,   false, ap_uint<128>("0x0A000002"), 0xC000, 0x12B7, 1080,   0, 0, 0, 0},
-        {"SPLIT 02 ctrl RoCE",          ap_uint<128>("0x0A000002"), 0xC000, 0x12B7, 28,     true,  0, 0, 0, 0,     ap_uint<128>("0x0A000002"), 0xC000, 0x12B7, 28},
+        {.name = "SPLIT 01 data RoCE", .their_address = ap_uint<128>("0x0A000002"), .their_port = 0xC000, .my_port = 0x12B7, .length = 1080, .splitIn = false,
+         .exp_data_their_address = ap_uint<128>("0x0A000002"), .exp_data_their_port = 0xC000, .exp_data_my_port = 0x12B7, .exp_data_length = 1080, .exp_ctrl_their_address = 0, .exp_ctrl_their_port = 0, .exp_ctrl_my_port = 0, .exp_ctrl_length = 0},
+        {.name = "SPLIT 02 ctrl RoCE", .their_address = ap_uint<128>("0x0A000002"), .their_port = 0xC000, .my_port = 0x12B7, .length = 28, .splitIn = true,
+         .exp_data_their_address = 0, .exp_data_their_port = 0, .exp_data_my_port = 0, .exp_data_length = 0, .exp_ctrl_their_address = ap_uint<128>("0x0A000002"), .exp_ctrl_their_port = 0xC000, .exp_ctrl_my_port = 0x12B7, .exp_ctrl_length = 28},
 
         // all fields zero / all fields at their maximum
-        {"SPLIT 03 data all zero",      0, 0x0000, 0x0000, 0x0000, false, 0, 0x0000, 0x0000, 0x0000, 0, 0, 0, 0},
-        {"SPLIT 04 ctrl all zero",      0, 0x0000, 0x0000, 0x0000, true,  0, 0, 0, 0, 0, 0x0000, 0x0000, 0x0000},
-        {"SPLIT 05 data all ones",      ap_uint<128>("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"), 0xFFFF, 0xFFFF, 0xFFFF, false, ap_uint<128>("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"), 0xFFFF, 0xFFFF, 0xFFFF, 0, 0, 0, 0},
-        {"SPLIT 06 ctrl all ones",      ap_uint<128>("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"), 0xFFFF, 0xFFFF, 0xFFFF, true,  0, 0, 0, 0, ap_uint<128>("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"), 0xFFFF, 0xFFFF, 0xFFFF},
+        {.name = "SPLIT 03 data all zero", .their_address = 0, .their_port = 0x0000, .my_port = 0x0000, .length = 0x0000, .splitIn = false,
+         .exp_data_their_address = 0, .exp_data_their_port = 0x0000, .exp_data_my_port = 0x0000, .exp_data_length = 0x0000, .exp_ctrl_their_address = 0, .exp_ctrl_their_port = 0, .exp_ctrl_my_port = 0, .exp_ctrl_length = 0},
+        {.name = "SPLIT 04 ctrl all zero", .their_address = 0, .their_port = 0x0000, .my_port = 0x0000, .length = 0x0000, .splitIn = true,
+         .exp_data_their_address = 0, .exp_data_their_port = 0, .exp_data_my_port = 0, .exp_data_length = 0, .exp_ctrl_their_address = 0, .exp_ctrl_their_port = 0x0000, .exp_ctrl_my_port = 0x0000, .exp_ctrl_length = 0x0000},
+        {.name = "SPLIT 05 data all ones", .their_address = ap_uint<128>("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"), .their_port = 0xFFFF, .my_port = 0xFFFF, .length = 0xFFFF, .splitIn = false,
+         .exp_data_their_address = ap_uint<128>("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"), .exp_data_their_port = 0xFFFF, .exp_data_my_port = 0xFFFF, .exp_data_length = 0xFFFF, .exp_ctrl_their_address = 0, .exp_ctrl_their_port = 0, .exp_ctrl_my_port = 0, .exp_ctrl_length = 0},
+        {.name = "SPLIT 06 ctrl all ones", .their_address = ap_uint<128>("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"), .their_port = 0xFFFF, .my_port = 0xFFFF, .length = 0xFFFF, .splitIn = true,
+         .exp_data_their_address = 0, .exp_data_their_port = 0, .exp_data_my_port = 0, .exp_data_length = 0, .exp_ctrl_their_address = ap_uint<128>("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"), .exp_ctrl_their_port = 0xFFFF, .exp_ctrl_my_port = 0xFFFF, .exp_ctrl_length = 0xFFFF},
 
         // the whole 128-bit address is carried, not only the low 32 or 64 bits
-        {"SPLIT 07 data IPv6",          ap_uint<128>("0x20010DB8000000000000000000000001"), 0xC001, 0x12B7, 500, false, ap_uint<128>("0x20010DB8000000000000000000000001"), 0xC001, 0x12B7, 500, 0, 0, 0, 0},
-        {"SPLIT 08 ctrl IPv6",          ap_uint<128>("0xFE800000000000000202B3FFFE1E8329"), 0xC002, 0x12B7, 48,  true,  0, 0, 0, 0, ap_uint<128>("0xFE800000000000000202B3FFFE1E8329"), 0xC002, 0x12B7, 48},
-        {"SPLIT 09 data bit 127",       ap_uint<128>("0x80000000000000000000000000000000"), 0x0001, 0x0001, 1,   false, ap_uint<128>("0x80000000000000000000000000000000"), 0x0001, 0x0001, 1,   0, 0, 0, 0},
-        {"SPLIT 10 ctrl bit 64",        ap_uint<128>("0x00000000000000010000000000000000"), 0x0002, 0x0002, 2,   true,  0, 0, 0, 0, ap_uint<128>("0x00000000000000010000000000000000"), 0x0002, 0x0002, 2},
-        {"SPLIT 11 data bit 32",        ap_uint<128>("0x00000000000000000000000100000000"), 0x0003, 0x0003, 3,   false, ap_uint<128>("0x00000000000000000000000100000000"), 0x0003, 0x0003, 3,   0, 0, 0, 0},
+        {.name = "SPLIT 07 data IPv6", .their_address = ap_uint<128>("0x20010DB8000000000000000000000001"), .their_port = 0xC001, .my_port = 0x12B7, .length = 500, .splitIn = false,
+         .exp_data_their_address = ap_uint<128>("0x20010DB8000000000000000000000001"), .exp_data_their_port = 0xC001, .exp_data_my_port = 0x12B7, .exp_data_length = 500, .exp_ctrl_their_address = 0, .exp_ctrl_their_port = 0, .exp_ctrl_my_port = 0, .exp_ctrl_length = 0},
+        {.name = "SPLIT 08 ctrl IPv6", .their_address = ap_uint<128>("0xFE800000000000000202B3FFFE1E8329"), .their_port = 0xC002, .my_port = 0x12B7, .length = 48, .splitIn = true,
+         .exp_data_their_address = 0, .exp_data_their_port = 0, .exp_data_my_port = 0, .exp_data_length = 0, .exp_ctrl_their_address = ap_uint<128>("0xFE800000000000000202B3FFFE1E8329"), .exp_ctrl_their_port = 0xC002, .exp_ctrl_my_port = 0x12B7, .exp_ctrl_length = 48},
+        {.name = "SPLIT 09 data bit 127", .their_address = ap_uint<128>("0x80000000000000000000000000000000"), .their_port = 0x0001, .my_port = 0x0001, .length = 1, .splitIn = false,
+         .exp_data_their_address = ap_uint<128>("0x80000000000000000000000000000000"), .exp_data_their_port = 0x0001, .exp_data_my_port = 0x0001, .exp_data_length = 1, .exp_ctrl_their_address = 0, .exp_ctrl_their_port = 0, .exp_ctrl_my_port = 0, .exp_ctrl_length = 0},
+        {.name = "SPLIT 10 ctrl bit 64", .their_address = ap_uint<128>("0x00000000000000010000000000000000"), .their_port = 0x0002, .my_port = 0x0002, .length = 2, .splitIn = true,
+         .exp_data_their_address = 0, .exp_data_their_port = 0, .exp_data_my_port = 0, .exp_data_length = 0, .exp_ctrl_their_address = ap_uint<128>("0x00000000000000010000000000000000"), .exp_ctrl_their_port = 0x0002, .exp_ctrl_my_port = 0x0002, .exp_ctrl_length = 2},
+        {.name = "SPLIT 11 data bit 32", .their_address = ap_uint<128>("0x00000000000000000000000100000000"), .their_port = 0x0003, .my_port = 0x0003, .length = 3, .splitIn = false,
+         .exp_data_their_address = ap_uint<128>("0x00000000000000000000000100000000"), .exp_data_their_port = 0x0003, .exp_data_my_port = 0x0003, .exp_data_length = 3, .exp_ctrl_their_address = 0, .exp_ctrl_their_port = 0, .exp_ctrl_my_port = 0, .exp_ctrl_length = 0},
 
         // every field different, so two swapped fields are caught
-        {"SPLIT 12 data distinct",      ap_uint<128>("0x00112233445566778899AABBCCDDEEFF"), 0x1234, 0x5678, 0x9ABC, false, ap_uint<128>("0x00112233445566778899AABBCCDDEEFF"), 0x1234, 0x5678, 0x9ABC, 0, 0, 0, 0},
-        {"SPLIT 13 ctrl distinct",      ap_uint<128>("0xFFEEDDCCBBAA99887766554433221100"), 0x4321, 0x8765, 0xCBA9, true,  0, 0, 0, 0, ap_uint<128>("0xFFEEDDCCBBAA99887766554433221100"), 0x4321, 0x8765, 0xCBA9},
+        {.name = "SPLIT 12 data distinct", .their_address = ap_uint<128>("0x00112233445566778899AABBCCDDEEFF"), .their_port = 0x1234, .my_port = 0x5678, .length = 0x9ABC, .splitIn = false,
+         .exp_data_their_address = ap_uint<128>("0x00112233445566778899AABBCCDDEEFF"), .exp_data_their_port = 0x1234, .exp_data_my_port = 0x5678, .exp_data_length = 0x9ABC, .exp_ctrl_their_address = 0, .exp_ctrl_their_port = 0, .exp_ctrl_my_port = 0, .exp_ctrl_length = 0},
+        {.name = "SPLIT 13 ctrl distinct", .their_address = ap_uint<128>("0xFFEEDDCCBBAA99887766554433221100"), .their_port = 0x4321, .my_port = 0x8765, .length = 0xCBA9, .splitIn = true,
+         .exp_data_their_address = 0, .exp_data_their_port = 0, .exp_data_my_port = 0, .exp_data_length = 0, .exp_ctrl_their_address = ap_uint<128>("0xFFEEDDCCBBAA99887766554433221100"), .exp_ctrl_their_port = 0x4321, .exp_ctrl_my_port = 0x8765, .exp_ctrl_length = 0xCBA9},
 
         // the routing only depends on splitIn: two in a row on each side, then alternating
-        {"SPLIT 14 ctrl twice (1)",     ap_uint<128>("0x0A000003"), 0xC010, 0x12B7, 36,   true,  0, 0, 0, 0, ap_uint<128>("0x0A000003"), 0xC010, 0x12B7, 36},
-        {"SPLIT 15 ctrl twice (2)",     ap_uint<128>("0x0A000004"), 0xC011, 0x12B7, 60,   true,  0, 0, 0, 0, ap_uint<128>("0x0A000004"), 0xC011, 0x12B7, 60},
-        {"SPLIT 16 data twice (1)",     ap_uint<128>("0x0A000005"), 0xC012, 0x12B7, 1060, false, ap_uint<128>("0x0A000005"), 0xC012, 0x12B7, 1060, 0, 0, 0, 0},
-        {"SPLIT 17 data twice (2)",     ap_uint<128>("0x0A000006"), 0xC013, 0x12B7, 1064, false, ap_uint<128>("0x0A000006"), 0xC013, 0x12B7, 1064, 0, 0, 0, 0},
-        {"SPLIT 18 ctrl alternate",     ap_uint<128>("0x0A000007"), 0xC014, 0x12B7, 40,   true,  0, 0, 0, 0, ap_uint<128>("0x0A000007"), 0xC014, 0x12B7, 40},
-        {"SPLIT 19 data alternate",     ap_uint<128>("0x0A000008"), 0xC015, 0x12B7, 100,  false, ap_uint<128>("0x0A000008"), 0xC015, 0x12B7, 100,  0, 0, 0, 0},
-        {"SPLIT 20 ctrl alternate",     ap_uint<128>("0x0A000009"), 0xC016, 0x12B7, 32,   true,  0, 0, 0, 0, ap_uint<128>("0x0A000009"), 0xC016, 0x12B7, 32},
+        {.name = "SPLIT 14 ctrl twice (1)", .their_address = ap_uint<128>("0x0A000003"), .their_port = 0xC010, .my_port = 0x12B7, .length = 36, .splitIn = true,
+         .exp_data_their_address = 0, .exp_data_their_port = 0, .exp_data_my_port = 0, .exp_data_length = 0, .exp_ctrl_their_address = ap_uint<128>("0x0A000003"), .exp_ctrl_their_port = 0xC010, .exp_ctrl_my_port = 0x12B7, .exp_ctrl_length = 36},
+        {.name = "SPLIT 15 ctrl twice (2)", .their_address = ap_uint<128>("0x0A000004"), .their_port = 0xC011, .my_port = 0x12B7, .length = 60, .splitIn = true,
+         .exp_data_their_address = 0, .exp_data_their_port = 0, .exp_data_my_port = 0, .exp_data_length = 0, .exp_ctrl_their_address = ap_uint<128>("0x0A000004"), .exp_ctrl_their_port = 0xC011, .exp_ctrl_my_port = 0x12B7, .exp_ctrl_length = 60},
+        {.name = "SPLIT 16 data twice (1)", .their_address = ap_uint<128>("0x0A000005"), .their_port = 0xC012, .my_port = 0x12B7, .length = 1060, .splitIn = false,
+         .exp_data_their_address = ap_uint<128>("0x0A000005"), .exp_data_their_port = 0xC012, .exp_data_my_port = 0x12B7, .exp_data_length = 1060, .exp_ctrl_their_address = 0, .exp_ctrl_their_port = 0, .exp_ctrl_my_port = 0, .exp_ctrl_length = 0},
+        {.name = "SPLIT 17 data twice (2)", .their_address = ap_uint<128>("0x0A000006"), .their_port = 0xC013, .my_port = 0x12B7, .length = 1064, .splitIn = false,
+         .exp_data_their_address = ap_uint<128>("0x0A000006"), .exp_data_their_port = 0xC013, .exp_data_my_port = 0x12B7, .exp_data_length = 1064, .exp_ctrl_their_address = 0, .exp_ctrl_their_port = 0, .exp_ctrl_my_port = 0, .exp_ctrl_length = 0},
+        {.name = "SPLIT 18 ctrl alternate", .their_address = ap_uint<128>("0x0A000007"), .their_port = 0xC014, .my_port = 0x12B7, .length = 40, .splitIn = true,
+         .exp_data_their_address = 0, .exp_data_their_port = 0, .exp_data_my_port = 0, .exp_data_length = 0, .exp_ctrl_their_address = ap_uint<128>("0x0A000007"), .exp_ctrl_their_port = 0xC014, .exp_ctrl_my_port = 0x12B7, .exp_ctrl_length = 40},
+        {.name = "SPLIT 19 data alternate", .their_address = ap_uint<128>("0x0A000008"), .their_port = 0xC015, .my_port = 0x12B7, .length = 100, .splitIn = false,
+         .exp_data_their_address = ap_uint<128>("0x0A000008"), .exp_data_their_port = 0xC015, .exp_data_my_port = 0x12B7, .exp_data_length = 100, .exp_ctrl_their_address = 0, .exp_ctrl_their_port = 0, .exp_ctrl_my_port = 0, .exp_ctrl_length = 0},
+        {.name = "SPLIT 20 ctrl alternate", .their_address = ap_uint<128>("0x0A000009"), .their_port = 0xC016, .my_port = 0x12B7, .length = 32, .splitIn = true,
+         .exp_data_their_address = 0, .exp_data_their_port = 0, .exp_data_my_port = 0, .exp_data_length = 0, .exp_ctrl_their_address = ap_uint<128>("0x0A000009"), .exp_ctrl_their_port = 0xC016, .exp_ctrl_my_port = 0x12B7, .exp_ctrl_length = 32},
     };
 } // namespace
 

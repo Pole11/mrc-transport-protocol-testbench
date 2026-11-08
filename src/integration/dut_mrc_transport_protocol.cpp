@@ -28,7 +28,7 @@ namespace
         hls::stream<ipUdpMeta> tx_meta;
         hls::stream<net_axis<DATA_WIDTH> > tx_data;
         hls::stream<txMeta> sq_meta;
-        hls::stream<ackMeta> rx_ack_meta;
+        hls::stream<cplMeta> rx_ack_meta;
         hls::stream<memCmd> mem_write_cmd;
         hls::stream<memCmd> mem_read_cmd;
         hls::stream<net_axis<DATA_WIDTH> > mem_write_data;
@@ -352,6 +352,19 @@ namespace
             if (memLastNotFinal)                    fail("mem_write_data has words after the last word");
         }
 
+
+        // WriteIMM completions released by this packet: one per expected ImmDt, in order
+        for (uint32_t imm : tc.exp_imm) {
+            if (tb.rx_ack_meta.empty()) {
+                fail("missing WriteIMM completion with ImmDt 0x" + [&]{ std::ostringstream s; s << std::hex << imm; return s.str(); }());
+                break;
+            }
+            const cplMeta m = tb.rx_ack_meta.read();
+            if (m.op_code != MRC_RDMA_WRITE_ONLY_IMM) fail("completion opcode " + std::to_string((unsigned)m.op_code) + " != MRC_RDMA_WRITE_ONLY_IMM");
+            if (m.qpn != (tc.dqp & 0xFFFF))           fail("completion qpn " + std::to_string(m.qpn.to_uint()) + " != " + std::to_string(tc.dqp & 0xFFFF));
+            if (m.imm != imm)                         fail("completion ImmDt 0x" + [&]{ std::ostringstream s; s << std::hex << m.imm.to_uint() << " != 0x" << imm; return s.str(); }());
+        }
+
         // ACK on the network TX side (checked for accepted and rejected rows, e.g. re-ACKed duplicates)
         size_t acks = 0;
         for (size_t i = 0; i < txPkts.size(); ++i) {
@@ -385,10 +398,10 @@ namespace
         };
 
         // the row owns exp_completions completions, in posted order, the last one for BTH.psn (= cack_psn).
-        // Every posted write carries psn[3:0] in laddr[51:48], which comes back as ackMeta.dst
+        // Every posted write carries psn[3:0] in laddr[51:48], which comes back as cplMeta.dst
         uint32_t completions = 0;
         while (!tb.rx_ack_meta.empty() && completions < tc.exp_completions) {
-            const ackMeta m = tb.rx_ack_meta.read();
+            const cplMeta m = tb.rx_ack_meta.read();
             const uint32_t expPsn = (tc.psn - tc.exp_completions + 1 + completions) & 0xFFFFFF;
             ++completions;
             if (m.op_code != MRC_ACK)       fail("completion opcode " + std::to_string((unsigned)m.op_code) + " != MRC_ACK");
@@ -488,7 +501,7 @@ int runMrcTransportProtocolTest()
     for (int i = 0; i < 60; ++i) tb.tickOneCycle();
 
     // the requestor QPs transmit their writes; the first transmissions are not part of any test case
-    // host = 1 and laddr[51:48] = psn[3:0]: the completion of each write comes back with ackMeta.dst = psn[3:0]
+    // host = 1 and laddr[51:48] = psn[3:0]: the completion of each write comes back with cplMeta.dst = psn[3:0]
     for (uint16_t qpn = REQ_QP_0; qpn <= REQ_QP_4; ++qpn)
         for (uint32_t i = 0; i < REQ_WRITES; ++i) {
             const uint64_t psnTag = ((qpn == REQ_QP_4 ? REQ_PSN_F : REQ_PSN) + i) & 0xF;

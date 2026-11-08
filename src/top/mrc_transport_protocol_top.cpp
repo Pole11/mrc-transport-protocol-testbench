@@ -6,7 +6,7 @@ void mrc_transport_protocol_top(
 	hls::stream<ipUdpMeta>&	m_axis_tx_meta,
 	hls::stream<net_axis<DATA_WIDTH> >& m_axis_tx_data,
 	hls::stream<txMeta>& s_axis_sq_meta,
-	hls::stream<ackMeta>& m_axis_rx_ack_meta,
+	hls::stream<cplMeta>& m_axis_rx_ack_meta,
 	hls::stream<memCmd>& m_axis_mem_write_cmd,
 	hls::stream<memCmd>& m_axis_mem_read_cmd,
 	hls::stream<net_axis<DATA_WIDTH> >& m_axis_mem_write_data,

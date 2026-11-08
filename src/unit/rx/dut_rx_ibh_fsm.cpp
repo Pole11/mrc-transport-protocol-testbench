@@ -14,12 +14,12 @@
 #include "mrc_transport_protocol/rx/rx_ibh_fsm.hpp"
 
 // it receives:
-// 1. metadata          (op_code, partition_key, dest_qp, psn, validPSN, numPkg, ackReq, rtx, ts, msnInc, cack)
+// 1. metadata          (op_code, partition_key, dest_qp, psn, validPSN, numPkg, ackReq, rtx, ts, msnInc, immInc, cack)
 // 2. exhMetaFifo       (numPkg) <-- probably it can be removed
-// 3. stateTable_rsp    (epsn, oldest_outstanding_psn (is it useful?), max_forward (is it useful?), retryCounter, bitmap, lastmap, prevAr)
+// 3. stateTable_rsp    (epsn, oldest_outstanding_psn (is it useful?), max_forward (is it useful?), retryCounter, bitmap, lastmap, immmap, prevAr)
 // it outputs:
-// 1. stateTable_upd_req        (qpn, epsn, retryCounter, isResponse, write, bitmap, lastmap, prevAr)
-// 2. metaOut                   (op_code, partition_key, dest_qp, psn, validPSN, numPkg, ackReq, rtx, ts, msnInc, cack)
+// 1. stateTable_upd_req        (qpn, epsn, retryCounter, isResponse, write, bitmap, lastmap, immmap, prevAr)
+// 2. metaOut                   (op_code, partition_key, dest_qp, psn, validPSN, numPkg, ackReq, rtx, ts, msnInc, immInc, cack)
 // 3. ibhEventFifo              (qpn, psn, validPsn, isNak)
 // 4. ibhDropFifo
 // 5. ibhDropMetaFifo           (isDrop, ackOnly)
@@ -42,14 +42,15 @@ namespace
         bool ackReq;
         bool rtx;
         bool ts;
+        uint16_t udp_len;   // input: udpLenIn
 
         // input: state of dest_qp in the state table, written before the packet (like a QP setup) if preload
         bool preload;
         uint32_t epsn;
         ap_uint<MRC_MPR> bitmap;
         ap_uint<MRC_MPR> lastmap;
+        ap_uint<MRC_MPR> immmap;
         bool prevAr;
-        uint16_t udp_len;
 
         // expected: state table
         //bool exp_read;              // false = cache hit, no read request
@@ -57,6 +58,7 @@ namespace
         uint32_t exp_epsn;
         ap_uint<MRC_MPR> exp_bitmap;
         ap_uint<MRC_MPR> exp_lastmap;
+        ap_uint<MRC_MPR> exp_immmap;
         bool exp_prevAr;
         uint32_t exp_maxRcvPsn;
         uint32_t exp_lowestUnsackedPsn;
@@ -66,6 +68,7 @@ namespace
         // expected: metaOut (only accepted packets), the other ibhMeta fields must be unchanged
         bool exp_metaOut;
         uint8_t exp_msnInc;
+        uint8_t exp_immInc;
         bool exp_ackReq;
         uint32_t exp_cack;
         uint32_t exp_sackOffset;    // only checked when exp_ackReq
@@ -134,6 +137,7 @@ namespace
                     entry.epsn    = req.epsn;
                     entry.bitmap  = req.bitmap;
                     entry.lastmap = req.lastmap;
+                    entry.immmap  = req.immmap;
                     entry.prevAr  = req.prevAr;
                     entry.maxRcvPsn         = req.maxRcvPsn;
                     entry.lowestUnsackedPsn = req.lowestUnsackedPsn;
@@ -158,6 +162,7 @@ namespace
         rxStateRsp state(testCase.epsn, 0, testCase.epsn, 0x7);
         state.bitmap  = testCase.bitmap;
         state.lastmap = testCase.lastmap;
+        state.immmap  = testCase.immmap;
         state.prevAr  = testCase.prevAr;
         // like a QP setup, except max_rcv_psn which must match the preloaded bitmap
         state.maxRcvPsn = testCase.epsn - 1;
@@ -191,6 +196,7 @@ namespace
             expect("write.epsn",                w.epsn,                 tc.exp_epsn);
             expect("write.bitmap",              w.bitmap,               tc.exp_bitmap);
             expect("write.lastmap",             w.lastmap,              tc.exp_lastmap);
+            expect("write.immmap",              w.immmap,               tc.exp_immmap);
             expect("write.prevAr",              w.prevAr,               tc.exp_prevAr);
             expect("write.maxRcvPsn",           w.maxRcvPsn,            tc.exp_maxRcvPsn);
             expect("write.lowestUnsackedPsn",   w.lowestUnsackedPsn,    tc.exp_lowestUnsackedPsn);
@@ -198,7 +204,7 @@ namespace
             expect("write.sackTriggerCnt",      w.sackTriggerCnt,       tc.exp_sackTriggerCnt);
         }
 
-        // metaOut: accepted packets only, with msnInc / ackReq / cack computed and everything else unchanged
+        // metaOut: accepted packets only, with msnInc / immInc / ackReq / cack computed and everything else unchanged
         expect("metaOut count", tb.metaOut.size(), tc.exp_metaOut ? 1 : 0);
         if (tc.exp_metaOut && !tb.metaOut.empty()) {
             const ibhMeta m = tb.metaOut.read();
@@ -211,6 +217,7 @@ namespace
             expect("metaOut.rtx",           m.rtx,           tc.rtx);
             expect("metaOut.ts",            m.ts,            tc.ts);
             expect("metaOut.msnInc",        m.msnInc,        tc.exp_msnInc);
+            expect("metaOut.immInc",        m.immInc,        tc.exp_immInc);
             expect("metaOut.ackReq",        m.ackReq,        tc.exp_ackReq);
             expect("metaOut.cack",          m.cack,          tc.exp_cack);
             expect("metaOut.oooCount",      m.oooCount,      tc.exp_oooCount);
@@ -261,52 +268,160 @@ namespace
 
     #define BIT(i) (ap_uint<MRC_MPR>(1) << (i))
     #define ALL_BUT_0 (~ap_uint<MRC_MPR>(1))
+    #define ODD_BITS ap_uint<MRC_MPR>("0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+
 
     // bit i of the maps is psn epsn + i. The state persists between rows (bench state table), so the rows must stay in this order
     // accepted packets: drop false, policy (false, false).
     // duplicates (bit already set or behind epsn): drop, policy (false, true), ACK epsn - 1, state written back (rcvd_bytes counted, sack_trigger_cnt reset)
     // out of window (epsn + 128 or more ahead): drop, policy (true, false), nothing else.
     // preloaded QPs start like after a QP setup: lowest_unsacked_psn = epsn - 1, counters 0, max_rcv_psn from the bitmap.
-    // columns: name, op_code, partition_key, dest_qp, psn, ackReq,rtx,ts,
-    //          preload, epsn, bitmap, lastmap, prevAr, udp_len,
-    //          exp_write, exp_epsn, exp_bitmap, exp_lastmap, exp_prevAr, exp_maxRcvPsn, exp_lowestUnsackedPsn, exp_rcvdBytes, exp_sackTriggerCnt,
-    //          exp_metaOut, exp_msnInc, exp_ackReq, exp_cack, exp_sackOffset, exp_oooCount,
-    //          exp_event, exp_event_psn, exp_drop, exp_isDrop, exp_ackOnly, exp_regInvalidPsnDropCount
+    // rows: designated initializers in the order of IbhFsmTestCase, a field that is not listed is 0 / false.
+    // one line per group: packet, preloaded state, expected state write, expected metaOut, expected event and drop
     const IbhFsmTestCase ibhFsmTestCases[] = {
-        {"IBH FSM 01 in order ONLY a", MRC_RDMA_WRITE_ONLY, 0xFFFF, 1, 0x100, 1,0,0, true,  0x100, 0, 0, false, 1080,   true,  0x101, 0, 0, false, 0x100, 0x140, 1120, 0,   true,  1, true , 0x100, 0, 0,   false, 0,   false, false, false, 0},
-        {"IBH FSM 02 in order ONLY rtx", MRC_RDMA_WRITE_ONLY, 0x1234, 1, 0x101, 0,1,1, false, 0, 0, 0, false, 1080,   true,  0x102, 0, 0, false, 0x101, 0x141, 2240, 0,   true,  1, true , 0x101, 0, 0,   false, 0,   false, false, false, 0},
-        {"IBH FSM 03 ahead +3 LAST a", MRC_RDMA_WRITE_LAST, 0xFFFF, 1, 0x105, 1,0,0, false, 0, 0, 0, false, 1080,   true,  0x102, BIT(3), BIT(3), true, 0x105, 0x141, 3360, 0,   true,  0, true , 0x101, 0, 1,   false, 0,   false, false, false, 0},
-        {"IBH FSM 04 ahead +1 FIRST", MRC_RDMA_WRITE_FIRST, 0xFFFF, 1, 0x103, 0,0,0, false, 0, 0, 0, false, 1080,   true,  0x102, BIT(1)|BIT(3), BIT(3), true, 0x105, 0x103, 4480, 1036,   true,  0, false, 0x101, 0, 2,   false, 0,   false, false, false, 0},
-        {"IBH FSM 05 ahead +2 MIDDLE", MRC_RDMA_WRITE_MIDDLE, 0xFFFF, 1, 0x104, 0,0,0, false, 0, 0, 0, false, 1080,   true,  0x102, BIT(1)|BIT(2)|BIT(3), BIT(3), true, 0x105, 0x103, 5600, 2072,   true,  0, false, 0x101, 0, 3,   false, 0,   false, false, false, 0},
-        {"IBH FSM 06 duplicate in window", MRC_RDMA_WRITE_MIDDLE, 0xFFFF, 1, 0x104, 1,0,0, false, 0, 0, 0, false, 1080,   true,  0x102, BIT(1)|BIT(2)|BIT(3), BIT(3), true, 0x105, 0x141, 6720, 0,   false, 0, false, 0, 0, 0,   true,  0x101,   true, false, true, 1},
-        {"IBH FSM 07 hole filled", MRC_RDMA_WRITE_ONLY, 0xFFFF, 1, 0x102, 0,0,0, false, 0, 0, 0, false, 1080,   true,  0x106, 0, 0, false, 0x105, 0x145, 7840, 0,   true,  2, true , 0x105, 0, 0,   false, 0,   false, false, false, 1},
-        {"IBH FSM 08 behind by 1", MRC_RDMA_WRITE_ONLY, 0xFFFF, 1, 0x105, 1,0,0, false, 0, 0, 0, false, 1080,   true,  0x106, 0, 0, false, 0x105, 0x145, 8960, 0,   false, 0, false, 0, 0, 0,   true,  0x105,   true, false, true, 2},
-        {"IBH FSM 09 far behind", MRC_RDMA_WRITE_ONLY, 0xFFFF, 1, 0x6, 1,0,0, false, 0, 0, 0, false, 1080,   true,  0x106, 0, 0, false, 0x105, 0x145, 10080, 0,   false, 0, false, 0, 0, 0,   true,  0x105,   true, false, true, 3},
-        {"IBH FSM 10 epsn + 128", MRC_RDMA_WRITE_ONLY, 0xFFFF, 1, 0x186, 1,0,0, false, 0, 0, 0, false, 1080,   false, 0, 0, 0, false, 0, 0, 0, 0,   false, 0, false, 0, 0, 0,   false, 0,   true, true, false, 4},
-        {"IBH FSM 11 far ahead", MRC_RDMA_WRITE_ONLY, 0xFFFF, 1, 0x500000, 1,0,0, false, 0, 0, 0, false, 1080,   false, 0, 0, 0, false, 0, 0, 0, 0,   false, 0, false, 0, 0, 0,   false, 0,   true, true, false, 5},
-        {"IBH FSM 12 epsn + 127 ONLY a", MRC_RDMA_WRITE_ONLY, 0xFFFF, 1, 0x185, 1,0,0, false, 0, 0, 0, false, 1080,   true,  0x106, BIT(127), BIT(127), true, 0x185, 0x185, 11200, 0,   true,  0, true , 0x105, 64, 1,   false, 0,   false, false, false, 5},
-        {"IBH FSM 13 QP2 ONLY a", MRC_RDMA_WRITE_ONLY, 0xFFFF, 2, 0x200, 1,0,0, true,  0x200, 0, 0, false, 1080,   true,  0x201, 0, 0, false, 0x200, 0x240, 1120, 0,   true,  1, true , 0x200, 0, 0,   false, 0,   false, false, false, 5},
-        {"IBH FSM 14 QP2 ONLY IMM", MRC_RDMA_WRITE_ONLY_IMM, 0xFFFF, 2, 0x201, 0,0,0, false, 0, 0, 0, false, 1080,   true,  0x202, 0, 0, false, 0x201, 0x240, 2240, 1032,   true,  1, false, 0x201, 0, 0,   false, 0,   false, false, false, 5},
-        {"IBH FSM 15 QP2 LAST IMM", MRC_RDMA_WRITE_LAST_IMM, 0xFFFF, 2, 0x202, 0,0,0, false, 0, 0, 0, false, 1080,   true,  0x203, 0, 0, false, 0x202, 0x240, 3360, 2064,   true,  1, false, 0x202, 0, 0,   false, 0,   false, false, false, 5},
-        {"IBH FSM 16 QP1 again", MRC_RDMA_WRITE_ONLY, 0xFFFF, 1, 0x106, 1,0,0, false, 0, 0, 0, false, 1080,   true,  0x107, BIT(126), BIT(126), true, 0x185, 0x185, 12320, 0,   true,  1, true , 0x106, 63, 1,   false, 0,   false, false, false, 5},
-        {"IBH FSM 17 QP1 AR still pending", MRC_RDMA_WRITE_ONLY, 0xFFFF, 1, 0x107, 0,0,0, false, 0, 0, 0, false, 1080,   true,  0x108, BIT(125), BIT(125), true, 0x185, 0x185, 13440, 1036,   true,  1, false, 0x107, 0, 1,   false, 0,   false, false, false, 5},
-        {"IBH FSM 18 wrap +2", MRC_RDMA_WRITE_ONLY, 0xFFFF, 3, 0x0, 0,0,0, true,  0xFFFFFE, 0, 0, false, 1080,   true,  0xFFFFFE, BIT(2), BIT(2), false, 0x0, 0xFFFFFD, 1120, 1036,   true,  0, false, 0xFFFFFD, 0, 1,   false, 0,   false, false, false, 5},
-        {"IBH FSM 19 wrap +1", MRC_RDMA_WRITE_ONLY, 0xFFFF, 3, 0xFFFFFF, 0,0,0, false, 0, 0, 0, false, 1080,   true,  0xFFFFFE, BIT(1)|BIT(2), BIT(1)|BIT(2), false, 0x0, 0xFFFFFD, 2240, 2072,   true,  0, false, 0xFFFFFD, 0, 2,   false, 0,   false, false, false, 5},
-        {"IBH FSM 20 wrap hole filled", MRC_RDMA_WRITE_ONLY, 0xFFFF, 3, 0xFFFFFE, 0,0,0, false, 0, 0, 0, false, 1080,   true,  0x1, 0, 0, false, 0x0, 0x0, 3360, 3108,   true,  3, false, 0x0, 0, 0,   false, 0,   false, false, false, 5},
-        {"IBH FSM 21 wrap duplicate", MRC_RDMA_WRITE_ONLY, 0xFFFF, 3, 0xFFFFFF, 0,0,0, false, 0, 0, 0, false, 1080,   true,  0x1, 0, 0, false, 0x0, 0x40, 4480, 0,   false, 0, false, 0, 0, 0,   true,  0x0,   true, false, true, 6},
-        {"IBH FSM 22 full window", MRC_RDMA_WRITE_ONLY, 0xFFFF, 4, 0x1000, 0,0,0, true,  0x1000, ALL_BUT_0, ALL_BUT_0, true, 1080,   true,  0x1080, 0, 0, false, 0x107F, 0x10BF, 1120, 0,   true,  128, true , 0x107F, 0, 0,   false, 0,   false, false, false, 6},
-        {"IBH FSM 23 QP setup again", MRC_RDMA_WRITE_ONLY, 0xFFFF, 4, 0x2000, 1,0,0, true,  0x2000, 0, 0, false, 1080,   true,  0x2001, 0, 0, false, 0x2000, 0x2040, 1120, 0,   true,  1, true , 0x2000, 0, 0,   false, 0,   false, false, false, 6},
-        {"IBH FSM 24 small pkt counts 1KB", MRC_RDMA_WRITE_ONLY, 0xFFFF, 5, 0x500, 0,0,0, true,  0x500, 0, 0, false, 100,   true,  0x501, 0, 0, false, 0x500, 0x500, 140, 1024,   true,  1, false, 0x500, 0, 0,   false, 0,   false, false, false, 6},
-        {"IBH FSM 25 large pkt", MRC_RDMA_WRITE_ONLY, 0xFFFF, 5, 0x501, 0,0,0, false, 0, 0, 0, false, 9000,   true,  0x502, 0, 0, false, 0x501, 0x501, 9180, 9980,   true,  1, false, 0x501, 0, 0,   false, 0,   false, false, false, 6},
-        {"IBH FSM 26 trigger cnt > thr", MRC_RDMA_WRITE_ONLY, 0xFFFF, 5, 0x502, 0,0,0, false, 0, 0, 0, false, 8000,   true,  0x503, 0, 0, false, 0x502, 0x542, 17220, 0,   true,  1, true , 0x502, 0, 0,   false, 0,   false, false, false, 6},
-        {"IBH FSM 27 rtx triggers SACK", MRC_RDMA_WRITE_ONLY, 0xFFFF, 5, 0x503, 0,1,0, false, 0, 0, 0, false, 1080,   true,  0x504, 0, 0, false, 0x503, 0x543, 18340, 0,   true,  1, true , 0x503, 0, 0,   false, 0,   false, false, false, 6},
-        {"IBH FSM 28 +10 no AR", MRC_RDMA_WRITE_ONLY, 0xFFFF, 6, 0x60A, 0,0,0, true,  0x600, 0, 0, false, 1080,   true,  0x600, BIT(10), BIT(10), false, 0x60A, 0x5FF, 1120, 1036,   true,  0, false, 0x5FF, 0, 1,   false, 0,   false, false, false, 6},
-        {"IBH FSM 29 +100 AR", MRC_RDMA_WRITE_ONLY, 0xFFFF, 6, 0x664, 1,0,0, false, 0, 0, 0, false, 1080,   true,  0x600, BIT(10)|BIT(100), BIT(10)|BIT(100), true, 0x664, 0x63F, 2240, 0,   true,  0, true , 0x5FF, 0, 2,   false, 0,   false, false, false, 6},
-        {"IBH FSM 30 +101 AR right edge", MRC_RDMA_WRITE_ONLY, 0xFFFF, 6, 0x665, 1,0,0, false, 0, 0, 0, false, 1080,   true,  0x600, BIT(10)|BIT(100)|BIT(101), BIT(10)|BIT(100)|BIT(101), true, 0x665, 0x665, 3360, 0,   true,  0, true , 0x5FF, 38, 3,   false, 0,   false, false, false, 6},
-        {"IBH FSM 31 +5 below lowest", MRC_RDMA_WRITE_ONLY, 0xFFFF, 6, 0x605, 0,0,0, false, 0, 0, 0, false, 1080,   true,  0x600, BIT(5)|BIT(10)|BIT(100)|BIT(101), BIT(5)|BIT(10)|BIT(100)|BIT(101), true, 0x665, 0x605, 4480, 1036,   true,  0, false, 0x5FF, 0, 4,   false, 0,   false, false, false, 6},
-        {"IBH FSM 32 +0 cack advances", MRC_RDMA_WRITE_ONLY, 0xFFFF, 6, 0x600, 0,0,0, false, 0, 0, 0, false, 1080,   true,  0x601, BIT(4)|BIT(9)|BIT(99)|BIT(100), BIT(4)|BIT(9)|BIT(99)|BIT(100), true, 0x665, 0x605, 5600, 2072,   true,  1, false, 0x600, 0, 4,   false, 0,   false, false, false, 6},
-        {"IBH FSM 33 duplicate resets cnt", MRC_RDMA_WRITE_ONLY, 0xFFFF, 6, 0x605, 0,0,0, false, 0, 0, 0, false, 1080,   true,  0x601, BIT(4)|BIT(9)|BIT(99)|BIT(100), BIT(4)|BIT(9)|BIT(99)|BIT(100), true, 0x665, 0x645, 6720, 0,   false, 0, false, 0, 0, 0,   true,  0x600,   true, false, true, 7},
-        {"IBH FSM 34 TSETH is not payload", MRC_RDMA_WRITE_ONLY, 0xFFFF, 5, 0x504, 0,0,1, false, 0, 0, 0, false, 1080,   true,  0x505, 0, 0, false, 0x504, 0x543, 19460, 1032,   true,  1, false, 0x504, 0, 0,   false, 0,   false, false, false, 7},
+        {.name = "IBH FSM 01 in order ONLY a", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x100, .ackReq = true, .udp_len = 1080,
+         .preload = true, .epsn = 0x100,
+         .exp_write = true, .exp_epsn = 0x101, .exp_maxRcvPsn = 0x100, .exp_lowestUnsackedPsn = 0x140, .exp_rcvdBytes = 1120,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_ackReq = true, .exp_cack = 0x100},
+        {.name = "IBH FSM 02 in order ONLY rtx", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0x1234, .dest_qp = 1, .psn = 0x101, .rtx = true, .ts = true, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x102, .exp_maxRcvPsn = 0x101, .exp_lowestUnsackedPsn = 0x141, .exp_rcvdBytes = 2240,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_ackReq = true, .exp_cack = 0x101},
+        {.name = "IBH FSM 03 ahead +3 LAST a", .op_code = MRC_RDMA_WRITE_LAST, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x105, .ackReq = true, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x102, .exp_bitmap = BIT(3), .exp_lastmap = BIT(3), .exp_prevAr = true, .exp_maxRcvPsn = 0x105, .exp_lowestUnsackedPsn = 0x141, .exp_rcvdBytes = 3360,
+         .exp_metaOut = true, .exp_msnInc = 0, .exp_ackReq = true, .exp_cack = 0x101, .exp_oooCount = 1},
+        {.name = "IBH FSM 04 ahead +1 FIRST", .op_code = MRC_RDMA_WRITE_FIRST, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x103, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x102, .exp_bitmap = BIT(1)|BIT(3), .exp_lastmap = BIT(3), .exp_prevAr = true, .exp_maxRcvPsn = 0x105, .exp_lowestUnsackedPsn = 0x103, .exp_rcvdBytes = 4480, .exp_sackTriggerCnt = 1036,
+         .exp_metaOut = true, .exp_msnInc = 0, .exp_cack = 0x101, .exp_oooCount = 2},
+        {.name = "IBH FSM 05 ahead +2 MIDDLE", .op_code = MRC_RDMA_WRITE_MIDDLE, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x104, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x102, .exp_bitmap = BIT(1)|BIT(2)|BIT(3), .exp_lastmap = BIT(3), .exp_prevAr = true, .exp_maxRcvPsn = 0x105, .exp_lowestUnsackedPsn = 0x103, .exp_rcvdBytes = 5600, .exp_sackTriggerCnt = 2072,
+         .exp_metaOut = true, .exp_msnInc = 0, .exp_cack = 0x101, .exp_oooCount = 3},
+        {.name = "IBH FSM 06 duplicate in window", .op_code = MRC_RDMA_WRITE_MIDDLE, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x104, .ackReq = true, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x102, .exp_bitmap = BIT(1)|BIT(2)|BIT(3), .exp_lastmap = BIT(3), .exp_prevAr = true, .exp_maxRcvPsn = 0x105, .exp_lowestUnsackedPsn = 0x141, .exp_rcvdBytes = 6720,
+         .exp_event = true, .exp_event_psn = 0x101, .exp_drop = true, .exp_ackOnly = true, .exp_regInvalidPsnDropCount = 1},
+        {.name = "IBH FSM 07 hole filled", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x102, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x106, .exp_maxRcvPsn = 0x105, .exp_lowestUnsackedPsn = 0x145, .exp_rcvdBytes = 7840,
+         .exp_metaOut = true, .exp_msnInc = 2, .exp_ackReq = true, .exp_cack = 0x105,
+         .exp_regInvalidPsnDropCount = 1},
+        {.name = "IBH FSM 08 behind by 1", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x105, .ackReq = true, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x106, .exp_maxRcvPsn = 0x105, .exp_lowestUnsackedPsn = 0x145, .exp_rcvdBytes = 8960,
+         .exp_event = true, .exp_event_psn = 0x105, .exp_drop = true, .exp_ackOnly = true, .exp_regInvalidPsnDropCount = 2},
+        {.name = "IBH FSM 09 far behind", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x6, .ackReq = true, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x106, .exp_maxRcvPsn = 0x105, .exp_lowestUnsackedPsn = 0x145, .exp_rcvdBytes = 10080,
+         .exp_event = true, .exp_event_psn = 0x105, .exp_drop = true, .exp_ackOnly = true, .exp_regInvalidPsnDropCount = 3},
+        {.name = "IBH FSM 10 epsn + 128", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x186, .ackReq = true, .udp_len = 1080,
+         .exp_drop = true, .exp_isDrop = true, .exp_regInvalidPsnDropCount = 4},
+        {.name = "IBH FSM 11 far ahead", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x500000, .ackReq = true, .udp_len = 1080,
+         .exp_drop = true, .exp_isDrop = true, .exp_regInvalidPsnDropCount = 5},
+        {.name = "IBH FSM 12 epsn + 127 ONLY a", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x185, .ackReq = true, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x106, .exp_bitmap = BIT(127), .exp_lastmap = BIT(127), .exp_prevAr = true, .exp_maxRcvPsn = 0x185, .exp_lowestUnsackedPsn = 0x185, .exp_rcvdBytes = 11200,
+         .exp_metaOut = true, .exp_msnInc = 0, .exp_ackReq = true, .exp_cack = 0x105, .exp_sackOffset = 64, .exp_oooCount = 1,
+         .exp_regInvalidPsnDropCount = 5},
+        {.name = "IBH FSM 13 QP2 ONLY a", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 2, .psn = 0x200, .ackReq = true, .udp_len = 1080,
+         .preload = true, .epsn = 0x200,
+         .exp_write = true, .exp_epsn = 0x201, .exp_maxRcvPsn = 0x200, .exp_lowestUnsackedPsn = 0x240, .exp_rcvdBytes = 1120,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_ackReq = true, .exp_cack = 0x200,
+         .exp_regInvalidPsnDropCount = 5},
+        {.name = "IBH FSM 14 QP2 ONLY IMM", .op_code = MRC_RDMA_WRITE_ONLY_IMM, .partition_key = 0xFFFF, .dest_qp = 2, .psn = 0x201, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x202, .exp_maxRcvPsn = 0x201, .exp_lowestUnsackedPsn = 0x240, .exp_rcvdBytes = 2240, .exp_sackTriggerCnt = 1032,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_immInc = 1, .exp_cack = 0x201,
+         .exp_regInvalidPsnDropCount = 5},
+        {.name = "IBH FSM 15 QP2 LAST IMM", .op_code = MRC_RDMA_WRITE_LAST_IMM, .partition_key = 0xFFFF, .dest_qp = 2, .psn = 0x202, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x203, .exp_maxRcvPsn = 0x202, .exp_lowestUnsackedPsn = 0x240, .exp_rcvdBytes = 3360, .exp_sackTriggerCnt = 2064,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_immInc = 1, .exp_cack = 0x202,
+         .exp_regInvalidPsnDropCount = 5},
+        {.name = "IBH FSM 16 QP1 again", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x106, .ackReq = true, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x107, .exp_bitmap = BIT(126), .exp_lastmap = BIT(126), .exp_prevAr = true, .exp_maxRcvPsn = 0x185, .exp_lowestUnsackedPsn = 0x185, .exp_rcvdBytes = 12320,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_ackReq = true, .exp_cack = 0x106, .exp_sackOffset = 63, .exp_oooCount = 1,
+         .exp_regInvalidPsnDropCount = 5},
+        {.name = "IBH FSM 17 QP1 AR still pending", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x107, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x108, .exp_bitmap = BIT(125), .exp_lastmap = BIT(125), .exp_prevAr = true, .exp_maxRcvPsn = 0x185, .exp_lowestUnsackedPsn = 0x185, .exp_rcvdBytes = 13440, .exp_sackTriggerCnt = 1036,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_cack = 0x107, .exp_oooCount = 1,
+         .exp_regInvalidPsnDropCount = 5},
+        {.name = "IBH FSM 18 wrap +2", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 3, .psn = 0x0, .udp_len = 1080,
+         .preload = true, .epsn = 0xFFFFFE,
+         .exp_write = true, .exp_epsn = 0xFFFFFE, .exp_bitmap = BIT(2), .exp_lastmap = BIT(2), .exp_lowestUnsackedPsn = 0xFFFFFD, .exp_rcvdBytes = 1120, .exp_sackTriggerCnt = 1036,
+         .exp_metaOut = true, .exp_msnInc = 0, .exp_cack = 0xFFFFFD, .exp_oooCount = 1,
+         .exp_regInvalidPsnDropCount = 5},
+        {.name = "IBH FSM 19 wrap +1", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 3, .psn = 0xFFFFFF, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0xFFFFFE, .exp_bitmap = BIT(1)|BIT(2), .exp_lastmap = BIT(1)|BIT(2), .exp_lowestUnsackedPsn = 0xFFFFFD, .exp_rcvdBytes = 2240, .exp_sackTriggerCnt = 2072,
+         .exp_metaOut = true, .exp_msnInc = 0, .exp_cack = 0xFFFFFD, .exp_oooCount = 2,
+         .exp_regInvalidPsnDropCount = 5},
+        {.name = "IBH FSM 20 wrap hole filled", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 3, .psn = 0xFFFFFE, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x1, .exp_rcvdBytes = 3360, .exp_sackTriggerCnt = 3108,
+         .exp_metaOut = true, .exp_msnInc = 3, .exp_cack = 0x0,
+         .exp_regInvalidPsnDropCount = 5},
+        {.name = "IBH FSM 21 wrap duplicate", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 3, .psn = 0xFFFFFF, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x1, .exp_lowestUnsackedPsn = 0x40, .exp_rcvdBytes = 4480,
+         .exp_event = true, .exp_event_psn = 0x0, .exp_drop = true, .exp_ackOnly = true, .exp_regInvalidPsnDropCount = 6},
+        {.name = "IBH FSM 22 full window", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 4, .psn = 0x1000, .udp_len = 1080,
+         .preload = true, .epsn = 0x1000, .bitmap = ALL_BUT_0, .lastmap = ALL_BUT_0, .immmap = ODD_BITS, .prevAr = true,
+         .exp_write = true, .exp_epsn = 0x1080, .exp_maxRcvPsn = 0x107F, .exp_lowestUnsackedPsn = 0x10BF, .exp_rcvdBytes = 1120,
+         .exp_metaOut = true, .exp_msnInc = 128, .exp_immInc = 64, .exp_ackReq = true, .exp_cack = 0x107F,
+         .exp_regInvalidPsnDropCount = 6},
+        {.name = "IBH FSM 23 QP setup again", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 4, .psn = 0x2000, .ackReq = true, .udp_len = 1080,
+         .preload = true, .epsn = 0x2000,
+         .exp_write = true, .exp_epsn = 0x2001, .exp_maxRcvPsn = 0x2000, .exp_lowestUnsackedPsn = 0x2040, .exp_rcvdBytes = 1120,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_ackReq = true, .exp_cack = 0x2000,
+         .exp_regInvalidPsnDropCount = 6},
+        {.name = "IBH FSM 24 small pkt counts 1KB", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 5, .psn = 0x500, .udp_len = 100,
+         .preload = true, .epsn = 0x500,
+         .exp_write = true, .exp_epsn = 0x501, .exp_maxRcvPsn = 0x500, .exp_lowestUnsackedPsn = 0x500, .exp_rcvdBytes = 140, .exp_sackTriggerCnt = 1024,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_cack = 0x500,
+         .exp_regInvalidPsnDropCount = 6},
+        {.name = "IBH FSM 25 large pkt", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 5, .psn = 0x501, .udp_len = 9000,
+         .exp_write = true, .exp_epsn = 0x502, .exp_maxRcvPsn = 0x501, .exp_lowestUnsackedPsn = 0x501, .exp_rcvdBytes = 9180, .exp_sackTriggerCnt = 9980,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_cack = 0x501,
+         .exp_regInvalidPsnDropCount = 6},
+        {.name = "IBH FSM 26 trigger cnt > thr", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 5, .psn = 0x502, .udp_len = 8000,
+         .exp_write = true, .exp_epsn = 0x503, .exp_maxRcvPsn = 0x502, .exp_lowestUnsackedPsn = 0x542, .exp_rcvdBytes = 17220,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_ackReq = true, .exp_cack = 0x502,
+         .exp_regInvalidPsnDropCount = 6},
+        {.name = "IBH FSM 27 rtx triggers SACK", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 5, .psn = 0x503, .rtx = true, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x504, .exp_maxRcvPsn = 0x503, .exp_lowestUnsackedPsn = 0x543, .exp_rcvdBytes = 18340,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_ackReq = true, .exp_cack = 0x503,
+         .exp_regInvalidPsnDropCount = 6},
+        {.name = "IBH FSM 28 +10 no AR", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 6, .psn = 0x60A, .udp_len = 1080,
+         .preload = true, .epsn = 0x600,
+         .exp_write = true, .exp_epsn = 0x600, .exp_bitmap = BIT(10), .exp_lastmap = BIT(10), .exp_maxRcvPsn = 0x60A, .exp_lowestUnsackedPsn = 0x5FF, .exp_rcvdBytes = 1120, .exp_sackTriggerCnt = 1036,
+         .exp_metaOut = true, .exp_msnInc = 0, .exp_cack = 0x5FF, .exp_oooCount = 1,
+         .exp_regInvalidPsnDropCount = 6},
+        {.name = "IBH FSM 29 +100 AR", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 6, .psn = 0x664, .ackReq = true, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x600, .exp_bitmap = BIT(10)|BIT(100), .exp_lastmap = BIT(10)|BIT(100), .exp_prevAr = true, .exp_maxRcvPsn = 0x664, .exp_lowestUnsackedPsn = 0x63F, .exp_rcvdBytes = 2240,
+         .exp_metaOut = true, .exp_msnInc = 0, .exp_ackReq = true, .exp_cack = 0x5FF, .exp_oooCount = 2,
+         .exp_regInvalidPsnDropCount = 6},
+        {.name = "IBH FSM 30 +101 AR right edge", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 6, .psn = 0x665, .ackReq = true, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x600, .exp_bitmap = BIT(10)|BIT(100)|BIT(101), .exp_lastmap = BIT(10)|BIT(100)|BIT(101), .exp_prevAr = true, .exp_maxRcvPsn = 0x665, .exp_lowestUnsackedPsn = 0x665, .exp_rcvdBytes = 3360,
+         .exp_metaOut = true, .exp_msnInc = 0, .exp_ackReq = true, .exp_cack = 0x5FF, .exp_sackOffset = 38, .exp_oooCount = 3,
+         .exp_regInvalidPsnDropCount = 6},
+        {.name = "IBH FSM 31 +5 below lowest", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 6, .psn = 0x605, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x600, .exp_bitmap = BIT(5)|BIT(10)|BIT(100)|BIT(101), .exp_lastmap = BIT(5)|BIT(10)|BIT(100)|BIT(101), .exp_prevAr = true, .exp_maxRcvPsn = 0x665, .exp_lowestUnsackedPsn = 0x605, .exp_rcvdBytes = 4480, .exp_sackTriggerCnt = 1036,
+         .exp_metaOut = true, .exp_msnInc = 0, .exp_cack = 0x5FF, .exp_oooCount = 4,
+         .exp_regInvalidPsnDropCount = 6},
+        {.name = "IBH FSM 32 +0 cack advances", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 6, .psn = 0x600, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x601, .exp_bitmap = BIT(4)|BIT(9)|BIT(99)|BIT(100), .exp_lastmap = BIT(4)|BIT(9)|BIT(99)|BIT(100), .exp_prevAr = true, .exp_maxRcvPsn = 0x665, .exp_lowestUnsackedPsn = 0x605, .exp_rcvdBytes = 5600, .exp_sackTriggerCnt = 2072,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_cack = 0x600, .exp_oooCount = 4,
+         .exp_regInvalidPsnDropCount = 6},
+        {.name = "IBH FSM 33 duplicate resets cnt", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 6, .psn = 0x605, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x601, .exp_bitmap = BIT(4)|BIT(9)|BIT(99)|BIT(100), .exp_lastmap = BIT(4)|BIT(9)|BIT(99)|BIT(100), .exp_prevAr = true, .exp_maxRcvPsn = 0x665, .exp_lowestUnsackedPsn = 0x645, .exp_rcvdBytes = 6720,
+         .exp_event = true, .exp_event_psn = 0x600, .exp_drop = true, .exp_ackOnly = true, .exp_regInvalidPsnDropCount = 7},
+        {.name = "IBH FSM 34 TSETH is not payload", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 5, .psn = 0x504, .ts = true, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x505, .exp_maxRcvPsn = 0x504, .exp_lowestUnsackedPsn = 0x543, .exp_rcvdBytes = 19460, .exp_sackTriggerCnt = 1032,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_cack = 0x504,
+         .exp_regInvalidPsnDropCount = 7},
+        // two WriteIMMs ahead of a hole are marked in immmap but not completed; the FIRST that closes the hole completes both
+        {.name = "IBH FSM 35 +2 LAST IMM", .op_code = MRC_RDMA_WRITE_LAST_IMM, .partition_key = 0xFFFF, .dest_qp = 7, .psn = 0x702, .udp_len = 1080,
+         .preload = true, .epsn = 0x700,
+         .exp_write = true, .exp_epsn = 0x700, .exp_bitmap = BIT(2), .exp_lastmap = BIT(2), .exp_immmap = BIT(2), .exp_maxRcvPsn = 0x702, .exp_lowestUnsackedPsn = 0x6FF, .exp_rcvdBytes = 1120, .exp_sackTriggerCnt = 1032,
+         .exp_metaOut = true, .exp_msnInc = 0, .exp_cack = 0x6FF, .exp_oooCount = 1,
+         .exp_regInvalidPsnDropCount = 7},
+        {.name = "IBH FSM 36 +1 ONLY IMM", .op_code = MRC_RDMA_WRITE_ONLY_IMM, .partition_key = 0xFFFF, .dest_qp = 7, .psn = 0x701, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x700, .exp_bitmap = BIT(1)|BIT(2), .exp_lastmap = BIT(1)|BIT(2), .exp_immmap = BIT(1)|BIT(2), .exp_maxRcvPsn = 0x702, .exp_lowestUnsackedPsn = 0x6FF, .exp_rcvdBytes = 2240, .exp_sackTriggerCnt = 2064,
+         .exp_metaOut = true, .exp_msnInc = 0, .exp_cack = 0x6FF, .exp_oooCount = 2,
+         .exp_regInvalidPsnDropCount = 7},
+        {.name = "IBH FSM 37 +0 FIRST closes hole", .op_code = MRC_RDMA_WRITE_FIRST, .partition_key = 0xFFFF, .dest_qp = 7, .psn = 0x700, .udp_len = 1080,
+         .exp_write = true, .exp_epsn = 0x703, .exp_maxRcvPsn = 0x702, .exp_lowestUnsackedPsn = 0x702, .exp_rcvdBytes = 3360, .exp_sackTriggerCnt = 3100,
+         .exp_metaOut = true, .exp_msnInc = 2, .exp_immInc = 2, .exp_cack = 0x702,
+         .exp_regInvalidPsnDropCount = 7},
     };
 } // namespace
 
