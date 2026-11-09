@@ -15,6 +15,7 @@ int runIpUdpMetaHandlerTest();      // src/unit/rx/dut_ip_udp_meta_handler.cpp
 int runMergeRxPkgsTest();           // src/unit/rx/dut_merge_rx_pkgs.cpp
 int runRxExhPayloadTest();          // src/unit/rx/dut_rx_exh_payload.cpp
 int runDropOooIbhTest();            // src/unit/rx/dut_drop_ooo_ibh.cpp
+int runRxReqFsmTest();              // src/unit/rx/dut_rx_req_fsm.cpp
 
 int runStateTableTest();            // src/unit/tables/dut_state_table.cpp
 int runImmTableTest();              // src/unit/tables/dut_imm_table.cpp

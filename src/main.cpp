@@ -18,6 +18,7 @@ int main()
     const int runRxExhPayloadTestResult = runRxExhPayloadTest();
     const int runDropOooIbhTestResult = runDropOooIbhTest();
     const int runImmTableTestResult = runImmTableTest();
+    const int runRxReqFsmTestResult = runRxReqFsmTest();
 
     std::cout << std::endl << "-- RECAP --" << std::endl;
 
@@ -91,6 +92,11 @@ int main()
     else
         std::cerr << "[FAIL] imm_table test" << std::endl;
 
+    if (runRxReqFsmTestResult == 0)
+        std::cout << "[PASS] rx_req_fsm test\n";
+    else
+        std::cerr << "[FAIL] rx_req_fsm test\n";
+
     return mrcTransportProtocolTestResult || 
         rxProcessIbhTestResult || 
         runSplitIpUdpMetaTestResult || 
@@ -104,5 +110,6 @@ int main()
         runMergeRxPkgsTestResult ||
         runRxExhPayloadTestResult ||
         runDropOooIbhTestResult ||
-        runImmTableTestResult;
+        runImmTableTestResult ||
+        runRxReqFsmTestResult;
 }

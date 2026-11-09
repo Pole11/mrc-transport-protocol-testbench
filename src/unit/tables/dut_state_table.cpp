@@ -44,6 +44,9 @@ namespace
 
         // the entry of qpn after this row: a write sends the fields its port owns, a read must return them
         stateTableEntry entry;
+        
+        // an RX / CTRL read must report valid = false: qpn >= MAX_QPS or never set up. Its fields are not checked
+        bool exp_invalid;
     };
 
     struct StateTableTestBench
@@ -118,9 +121,14 @@ namespace
         expect("txIbh rsp count",  tb.stateTable2txIbh_rsp.size(),  !tc.write && tc.port == TX_IBH);
         expect("qpi rsp count",    tb.stateTable2qpi_rsp.size(),    !tc.write && tc.port == QPI);
 
-        // an invalid QP has no state: only the presence of the response is checked
+        // an invalid QP has no state: only valid = false is checked (TX and QPI reads: only the presence of the response)
+        if (!tc.write && tc.exp_invalid) {
+            if (tc.port == RX_IBH && !tb.stateTable2rxIbh_rsp.empty())  expect("valid", tb.stateTable2rxIbh_rsp.read().valid, false);
+            if (tc.port == RX_CTRL && !tb.stateTable2rxCtrl_rsp.empty()) expect("valid", tb.stateTable2rxCtrl_rsp.read().valid, false);
+        }
+
         const stateTableEntry& e = tc.entry;
-        if (!tc.write && tc.qpn < MAX_QPS) {
+        if (!tc.write && tc.qpn < MAX_QPS && !tc.exp_invalid) {
             if (tc.port == RX_IBH && !tb.stateTable2rxIbh_rsp.empty()) {
                 rxStateRsp r = tb.stateTable2rxIbh_rsp.read();
                 if (tc.isResponse) {
@@ -128,7 +136,8 @@ namespace
                     expect("oldest_outstanding_psn (req_old_valid)", r.oldest_outstanding_psn, e.req_old_valid);
                     expect("max_forward (req_next_psn - 1)",         r.max_forward,            (ap_uint<24>) (e.req_next_psn - 1));
                 } else {
-                    expect("epsn",                   r.epsn,                   e.resp_epsn);
+                    expect("valid",                  r.valid,                  true);
+                    expect("epsn",                   r.epsn,                   e.resp_epsn);                    
                     expect("oldest_outstanding_psn", r.oldest_outstanding_psn, e.resp_old_outstanding);
                     expect("max_forward",            r.max_forward,            e.resp_epsn);
                     expect("retryCounter",           r.retryCounter,           e.retryCounter);
@@ -144,6 +153,7 @@ namespace
             }
             if (tc.port == RX_CTRL && !tb.stateTable2rxCtrl_rsp.empty()) {
                 reqStateRsp r = tb.stateTable2rxCtrl_rsp.read();
+                expect("valid",        r.valid,        true);
                 expect("unack_psn",    r.unack_psn,    e.req_old_unack);
                 expect("max_psn_sent", r.max_psn_sent, (ap_uint<24>) (e.req_next_psn - 1));
                 expect("retries",      r.retries,      e.req_retries);
@@ -408,9 +418,9 @@ namespace
          .port = QPI, .qpn = 0xFFFF, .write = true, .isResponse = false, .selective = false,
          .entry = {.resp_epsn = 0x0F0F0F, .resp_old_outstanding = 0x0F0F0F, .resp_max_rcv_psn = 0x0F0F0E, .resp_lowest_unsacked_psn = 0x0F0F0E, .req_next_psn = 0x0E0E0E, .req_old_unack = 0x0E0E0E, .req_old_valid = 0x0E0E0E, .retryCounter = 7}},
         {.name = "STATE 65 RX read qpn 256", .concurrent = false,
-         .port = RX_IBH, .qpn = 256, .write = false, .isResponse = false, .selective = false, .entry = {}},
+         .port = RX_IBH, .qpn = 256, .write = false, .isResponse = false, .selective = false, .entry = {}, .exp_invalid = true},
         {.name = "STATE 66 CTRL read qpn 0x0101", .concurrent = false,
-         .port = RX_CTRL, .qpn = 0x0101, .write = false, .isResponse = false, .selective = false, .entry = {}},
+         .port = RX_CTRL, .qpn = 0x0101, .write = false, .isResponse = false, .selective = false, .entry = {}, .exp_invalid = true},
         {.name = "STATE 67 TX read qpn 0x0103", .concurrent = false,
          .port = TX_IBH, .qpn = 0x0103, .write = false, .isResponse = false, .selective = false, .entry = {}},
         {.name = "STATE 68 QPI read qpn 0xFFFF", .concurrent = false,
@@ -427,7 +437,12 @@ namespace
         {.name = "STATE 72 QP255 untouched", .concurrent = false,
          .port = TX_IBH, .qpn = 255, .write = false, .isResponse = false, .selective = false,
          .entry = {.resp_epsn = 0x0FF002, .resp_old_outstanding = 0x0FF000, .resp_bitmap = ap_uint<128>("0x80000000000000000000000000000002"), .resp_lastmap = ap_uint<128>("0x80000000000000000000000000000000"), .resp_max_rcv_psn = 0x0FF081, .resp_lowest_unsacked_psn = 0x0FF001, .resp_rcvd_bytes = 0x00080000, .resp_sack_trigger_cnt = 0x001000, .req_next_psn = 0x0FF100, .req_old_unack = 0x0FF101, .req_old_valid = 0x0FF100, .retryCounter = 5, .req_retries = 1}},
-    };
+        // a QP in range that was never set up is invalid too (QP 4: no setup row)
+        {.name = "STATE 73 RX read QP4 never set up", .concurrent = false,
+         .port = RX_IBH, .qpn = 4, .write = false, .isResponse = false, .selective = false, .entry = {}, .exp_invalid = true},
+        {.name = "STATE 74 CTRL read QP4 never set up", .concurrent = false,
+         .port = RX_CTRL, .qpn = 4, .write = false, .isResponse = false, .selective = false, .entry = {}, .exp_invalid = true},
+        };
 } // namespace
 
 int runStateTableTest()

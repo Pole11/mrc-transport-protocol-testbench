@@ -865,6 +865,19 @@ namespace
                   .rqmsn = 0, .msn = 2, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xA2000, .r_key = RKEY, .dmalen = 64, .immDt = 0, .payload = buildWritePayload(64,0x92),
                   .exp_accepted = true, .exp_ack = true, .exp_cack_psn = FIRST_RX_PSN_3+0x101, .exp_ack_msn = 2, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
         
+        // invalid QPs are silently dropped: 0x110 is beyond MAX_QPS (it aliases QP 0x10, PSN inside its window),
+        // 0x20 was never set up (zero state: epsn 0, PSN 0 would be accepted)
+        WRITE_TC({.name = "BAD QP 0x110 29a", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = 0x110, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+0x102,
+                  .rqmsn = 0, .msn = 2, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xB1000, .r_key = RKEY, .dmalen = 64, .immDt = 0, .payload = buildWritePayload(64,0xA1),
+                  .exp_accepted = false, .exp_ack = false, .exp_cack_psn = 0, .exp_ack_msn = 0, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
+        WRITE_TC({.name = "UNUSED QP 0x20 29b", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = 0x20, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = 0,
+                  .rqmsn = 0, .msn = 0, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xB2000, .r_key = RKEY, .dmalen = 64, .immDt = 0, .payload = buildWritePayload(64,0xA2),
+                  .exp_accepted = false, .exp_ack = false, .exp_cack_psn = 0, .exp_ack_msn = 0, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
+        // 24-bit dqp: 0x010010 is QP 0x10 if only 16 bits are kept (PSN inside QP 0x10's window)
+        WRITE_TC({.name = "BAD QP 0x010010 29c", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = 0x010010, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+0x102,
+                  .rqmsn = 0, .msn = 2, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xB3000, .r_key = RKEY, .dmalen = 64, .immDt = 0, .payload = buildWritePayload(64,0xA3),
+                  .exp_accepted = false, .exp_ack = false, .exp_cack_psn = 0, .exp_ack_msn = 0, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
+        
         // RESPONDER SIDE
     };
 }

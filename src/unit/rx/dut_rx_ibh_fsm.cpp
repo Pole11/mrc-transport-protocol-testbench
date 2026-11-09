@@ -171,6 +171,8 @@ namespace
         state.lowestUnsackedPsn = testCase.epsn - 1;
         state.rcvdBytes         = 0;
         state.sackTriggerCnt    = 0;
+        state.valid             = true;
+
         return state;
     }
 
