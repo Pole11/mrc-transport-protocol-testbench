@@ -157,7 +157,6 @@ namespace
                 expect("unack_psn",    r.unack_psn,    e.req_old_unack);
                 expect("max_psn_sent", r.max_psn_sent, (ap_uint<24>) (e.req_next_psn - 1));
                 expect("retries",      r.retries,      e.req_retries);
-                expect("error",        r.error,        e.state == ERROR);
             }
             if ((tc.port == TX_IBH && !tb.stateTable2txIbh_rsp.empty()) || (tc.port == QPI && !tb.stateTable2qpi_rsp.empty())) {
                 stateTableEntry s = tc.port == TX_IBH ? tb.stateTable2txIbh_rsp.read() : tb.stateTable2qpi_rsp.read();

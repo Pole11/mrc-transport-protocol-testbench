@@ -35,6 +35,8 @@ namespace
 
         // expected: ImmDt on m_axis_rx_imm_meta by the end of the cycles, in order, all with this row's qpn
         std::vector<uint32_t> exp_imm;
+        // expected last bit of each completion: last of the request that released it. Empty = only the final one
+        std::vector<bool> exp_last;
     };
 
     struct ImmTableTestBench
@@ -72,11 +74,12 @@ namespace
         if (!tb.rxExh2immTable_req.empty()) fail("request not consumed");
         expect("completion count", tb.m_axis_rx_imm_meta.size(), tc.exp_imm.size());
 
-        for (uint32_t imm : tc.exp_imm) {
+        for (size_t k = 0; k < tc.exp_imm.size(); ++k) {
             if (tb.m_axis_rx_imm_meta.empty()) break;
             const immMeta m = tb.m_axis_rx_imm_meta.read();
             expect("qpn",   m.qpn, tc.qpn);
-            expect("ImmDt", m.imm, imm);
+            expect("ImmDt", m.imm, tc.exp_imm[k]);
+            expect("last",  m.last, tc.exp_last.empty() ? k + 1 == tc.exp_imm.size() : tc.exp_last[k]);
         }
 
         // whatever is left (wrong counts above) must not leak into the next test case
@@ -127,7 +130,7 @@ namespace
         {.name = "IMM 21 QP 8 held 1",         .qpn = 8, .hasImmDt = true,  .rqmsn = 1, .immDt = 0x80000001, .head = 1, .immInc = 0, .cycles = 0, .exp_imm = {}},
         {.name = "IMM 22 QP 8 held 2",         .qpn = 8, .hasImmDt = true,  .rqmsn = 2, .immDt = 0x80000002, .head = 1, .immInc = 0, .cycles = 0, .exp_imm = {}},
         {.name = "IMM 23 QP 8 burst, 1 cycle", .qpn = 8, .hasImmDt = true,  .rqmsn = 3, .immDt = 0x80000003, .head = 1, .immInc = 3, .cycles = 1, .exp_imm = {}},
-        {.name = "IMM 24 QP 8 queued",         .qpn = 8, .hasImmDt = true,  .rqmsn = 4, .immDt = 0x80000004, .head = 4, .immInc = 1, .cycles = 5, .exp_imm = {0x80000001, 0x80000002, 0x80000003, 0x80000004}},
+        {.name = "IMM 24 QP 8 queued",         .qpn = 8, .hasImmDt = true,  .rqmsn = 4, .immDt = 0x80000004, .head = 4, .immInc = 1, .cycles = 5, .exp_imm = {0x80000001, 0x80000002, 0x80000003, 0x80000004}, .exp_last = {false, false, true, true}},
 
         // all 32 bits of ImmDt are kept
         {.name = "IMM 25 ImmDt all ones",      .qpn = 9, .hasImmDt = true,  .rqmsn = 1, .immDt = 0xFFFFFFFF, .head = 1, .immInc = 1, .cycles = 0, .exp_imm = {0xFFFFFFFF}},

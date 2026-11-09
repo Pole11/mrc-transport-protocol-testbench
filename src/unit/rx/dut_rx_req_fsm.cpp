@@ -85,7 +85,7 @@ namespace
         if (!tb.stateTable_req.empty()) {
             const reqStateReq read = tb.stateTable_req.read();
         if (read.write || read.qpn != (tc.qpn & 0xFFFF)) fail("first request is not the read of qpn");        }
-        tb.stateTable_rsp.write(reqStateRsp(tc.unack_psn, tc.max_psn_sent, 0, false, tc.valid));
+        tb.stateTable_rsp.write(reqStateRsp(tc.unack_psn, tc.max_psn_sent, 0, tc.valid));
 
         // PROCESS
         tb.tickOneCycle();

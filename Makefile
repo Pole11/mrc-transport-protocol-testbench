@@ -2,10 +2,15 @@ XILINX_HLS ?= /tools/Xilinx/Vitis_HLS/2022.1
 # change me
 NETSTACK   ?= ../pole11.Coyote/hw/services/network/hls
 
-DUT_SRCS := $(NETSTACK)/mrc_transport_protocol/mrc_transport_protocol.cpp \
-            $(NETSTACK)/mrc_transport_protocol/ib_utils.cpp \
-            $(NETSTACK)/axi_utils.cpp
-
+  DUT_SRCS := $(NETSTACK)/mrc_transport_protocol/mrc_transport_protocol.cpp \
+              $(NETSTACK)/mrc_transport_protocol/ib_utils.cpp \
+              $(NETSTACK)/axi_utils.cpp \
+              $(NETSTACK)/rocev2/rocev2.cpp \
+              $(NETSTACK)/ipv4/ipv4.cpp \
+              $(NETSTACK)/ipv4/ipv4_utils.cpp \
+              $(NETSTACK)/udp/udp.cpp \
+              $(NETSTACK)/crc/crc.cpp
+			  
 SRCS := $(wildcard src/*/*/*.cpp) \
 		$(wildcard src/*/*.cpp) \
         $(wildcard src/*.cpp) \

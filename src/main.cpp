@@ -19,6 +19,7 @@ int main()
     const int runDropOooIbhTestResult = runDropOooIbhTest();
     const int runImmTableTestResult = runImmTableTest();
     const int runRxReqFsmTestResult = runRxReqFsmTest();
+    const int runRocev2TestResult = runRocev2Test();
 
     std::cout << std::endl << "-- RECAP --" << std::endl;
 
@@ -97,6 +98,11 @@ int main()
     else
         std::cerr << "[FAIL] rx_req_fsm test\n";
 
+    if (runRocev2TestResult == 0)
+        std::cout << "[PASS] rocev2 test\n";
+    else
+        std::cerr << "[FAIL] rocev2 test\n";
+
     return mrcTransportProtocolTestResult || 
         rxProcessIbhTestResult || 
         runSplitIpUdpMetaTestResult || 
@@ -111,5 +117,6 @@ int main()
         runRxExhPayloadTestResult ||
         runDropOooIbhTestResult ||
         runImmTableTestResult ||
-        runRxReqFsmTestResult;
+        runRxReqFsmTestResult ||
+        runRocev2TestResult;
 }

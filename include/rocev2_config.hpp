@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #define RETRANS_EN
+#define ROCE_TRANSPORT_mrc
 
 const unsigned DATA_WIDTH = 64 * 8;
 

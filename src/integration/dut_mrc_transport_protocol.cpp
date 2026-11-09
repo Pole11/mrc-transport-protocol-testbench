@@ -328,8 +328,8 @@ namespace
 
         if (tc.exp_accepted) {
             // memory command
-            const bool isLast = tc.opcode == MRC_RDMA_WRITE_LAST     || tc.opcode == MRC_RDMA_WRITE_ONLY ||
-                                tc.opcode == MRC_RDMA_WRITE_LAST_IMM || tc.opcode == MRC_RDMA_WRITE_ONLY_IMM;
+            // lst = 1 only on the packet that completes WriteIMMs
+            const bool isLast = !tc.exp_imm.empty();
             if (memoryCommands.size() != 1) {
                 fail("expected exactly 1 memCmd, got " + std::to_string(memoryCommands.size()));
             } else {
@@ -338,7 +338,7 @@ namespace
                 if (c.qpn != (tc.dqp & 0xFFFF))                fail("memCmd qpn " + std::to_string(c.qpn.to_uint()) + " != " + std::to_string(tc.dqp & 0xFFFF));
                 if (c.addr != (tc.va & 0xFFFFFFFFFFFFULL))     fail("memCmd addr 0x" + [&]{ std::ostringstream s; s << std::hex << c.addr.to_uint64() << " != 0x" << (tc.va & 0xFFFFFFFFFFFFULL); return s.str(); }());
                 if (c.len != tc.payload.size())                fail("memCmd len " + std::to_string(c.len.to_uint()) + " != " + std::to_string(tc.payload.size()));
-                if ((c.lst == 1) != isLast)                    fail(std::string("memCmd lst=") + std::to_string(c.lst.to_uint()) + " but opcode is " + (isLast ? "last" : "not last"));
+                if ((c.lst == 1) != isLast)                    fail(std::string("memCmd lst=") + std::to_string(c.lst.to_uint()) + " but the packet completes " + std::to_string(tc.exp_imm.size()) + " WriteIMM(s)");
             }
 
             // payload on the memory data stream
@@ -355,15 +355,17 @@ namespace
         }
 
 
-        // WriteIMM completions released by this packet: one per expected ImmDt, in order
-        for (uint32_t imm : tc.exp_imm) {
+        // WriteIMM completions released by this packet: one per expected ImmDt, in order, last = 1 only on the final one
+        for (size_t k = 0; k < tc.exp_imm.size(); ++k) {
+            const uint32_t imm = tc.exp_imm[k];
             if (tb.rx_imm_meta.empty()) {
                 fail("missing WriteIMM completion with ImmDt 0x" + [&]{ std::ostringstream s; s << std::hex << imm; return s.str(); }());
                 break;
             }
             const immMeta m = tb.rx_imm_meta.read();
-            if (m.qpn != (tc.dqp & 0xFFFF)) fail("completion qpn " + std::to_string(m.qpn.to_uint()) + " != " + std::to_string(tc.dqp & 0xFFFF));
-            if (m.imm != imm)               fail("completion ImmDt 0x" + [&]{ std::ostringstream s; s << std::hex << m.imm.to_uint() << " != 0x" << imm; return s.str(); }());
+            if (m.qpn != (tc.dqp & 0xFFFF))           fail("completion qpn " + std::to_string(m.qpn.to_uint()) + " != " + std::to_string(tc.dqp & 0xFFFF));
+            if (m.imm != imm)                         fail("completion ImmDt 0x" + [&]{ std::ostringstream s; s << std::hex << m.imm.to_uint() << " != 0x" << imm; return s.str(); }());
+            if (m.last != (k + 1 == tc.exp_imm.size())) fail("completion " + std::to_string(k) + " last=" + std::to_string(m.last.to_uint()));
         }
 
         // ACK on the network TX side (checked for accepted and rejected rows, e.g. re-ACKed duplicates)
