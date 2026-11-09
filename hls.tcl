@@ -15,7 +15,7 @@ set DUT_SRCS [list $NETSTACK/mrc_transport_protocol/mrc_transport_protocol.cpp \
                    $NETSTACK/mrc_transport_protocol/ib_utils.cpp \
                    $NETSTACK/axi_utils.cpp \
                    {*}[glob $TB_DIR/src/top/*.cpp]]
-set TB_SRCS  [glob $TB_DIR/src/*.cpp $TB_DIR/src/integration/*.cpp $TB_DIR/src/unit/*.cpp]
+set TB_SRCS  [glob $TB_DIR/src/*.cpp $TB_DIR/src/integration/*.cpp $TB_DIR/src/unit/*/*.cpp]
 
 open_project -reset ${STEP}_prj
 set_top mrc_transport_protocol_top
@@ -61,7 +61,7 @@ if {$STEP == "cosim"} {
     create_clock -period 4 -name default
     csynth_design
     # -trace_level port is lighter; drop -wave_debug on headless machines
-    cosim_design -trace_level all -wave_debug -tool xsim
+   cosim_design -trace_level all -wave_debug -tool xsim -random_stall -enable_dataflow_profiling
 }
 
 exit

@@ -17,3 +17,4 @@ int runRxExhPayloadTest();          // src/unit/rx/dut_rx_exh_payload.cpp
 int runDropOooIbhTest();            // src/unit/rx/dut_drop_ooo_ibh.cpp
 
 int runStateTableTest();            // src/unit/tables/dut_state_table.cpp
+int runImmTableTest();              // src/unit/tables/dut_imm_table.cpp

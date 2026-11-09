@@ -85,6 +85,11 @@ namespace
         // Last, so the rows completing none leave it empty
         std::vector<uint32_t> exp_imm;
 
+        // set the QP up again just before this packet (same context as at start-up, expected PSN = this psn)
+        bool reconnect;
+        // update only the r_key of the QP just before this packet (virtual_address = 0xDEADBEEF): MSN and RQMSN carry on
+        bool rkey_update;
+
         // how many cycles before feeding next packet
         int32_t after_cycles;
     };
@@ -109,7 +114,7 @@ namespace
         uint32_t msn;   // 24 bits
 
         // expectations
-        uint32_t exp_completions; // cplMeta on rx_ack_meta, one per released PSN
+        uint32_t exp_completions; // ackMeta on rx_ack_meta, one per released PSN
 
         // how many cycles before feeding next packet
         int32_t after_cycles;
@@ -831,6 +836,25 @@ namespace
         WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY 25c", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = RSP_QP_3, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+16,
                   .rqmsn = 0, .msn = 11, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0x9C000, .r_key = RKEY, .dmalen = 64, .immDt = 0x00000000, .payload = buildWritePayload(64,0x73),
                   .exp_accepted = true, .exp_ack = true, .exp_cack_psn = FIRST_RX_PSN_3+18, .exp_ack_msn = 14, .exp_syndrome = 0x00, .exp_imm = {0x66666666, 0x77777777}, .after_cycles = DRAIN}),
+        
+        // reconnect: a packet held ahead of a hole (26a) is left in the old connection. After the QP is set up again (26b)
+        // epsn, bitmap, MSN and RQMSN restart: the first WriteIMM completes alone, with MSN 1 and its ImmDt read at RQMSN 1.
+        // The hole of the old connection arriving late (26c) is a duplicate: never written
+        WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY 26a", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = RSP_QP_3, .a = 0, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+20,
+                  .rqmsn = 0, .msn = 15, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0x9D000, .r_key = RKEY, .dmalen = 64, .immDt = 0x00000000, .payload = buildWritePayload(64,0x81),
+                  .exp_accepted = true, .exp_ack = false, .exp_cack_psn = 0, .exp_ack_msn = 0, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
+        WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY_IMM 26b", .opcode = MRC_RDMA_WRITE_ONLY_IMM, .p_key = 0xFFFF, .dqp = RSP_QP_3, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+0x100,
+                  .rqmsn = 1, .msn = 0, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0x9E000, .r_key = RKEY, .dmalen = 64, .immDt = 0xC0FFEE01, .payload = buildWritePayload(64,0x82),
+                  .exp_accepted = true, .exp_ack = true, .exp_cack_psn = FIRST_RX_PSN_3+0x100, .exp_ack_msn = 1, .exp_syndrome = 0x00, .exp_imm = {0xC0FFEE01}, .reconnect = true, .after_cycles = BACK_TO_BACK}),
+        WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY 26c", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = RSP_QP_3, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+19,
+                  .rqmsn = 0, .msn = 14, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0x9F000, .r_key = RKEY, .dmalen = 64, .immDt = 0x00000000, .payload = buildWritePayload(64,0x83),
+                  .exp_accepted = false, .exp_ack = true, .exp_cack_psn = FIRST_RX_PSN_3+0x100, .exp_ack_msn = 1, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
+
+        // rkey update in the middle of the connection: the second WriteIMM still gets MSN 2 and its own ImmDt (RQMSN 2).
+        // A reset would give MSN 1 and the ImmDt of 26b (slot 1)
+        WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY_IMM 27a", .opcode = MRC_RDMA_WRITE_ONLY_IMM, .p_key = 0xFFFF, .dqp = RSP_QP_3, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+0x101,
+                  .rqmsn = 2, .msn = 1, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xA0000, .r_key = RKEY, .dmalen = 64, .immDt = 0xC0FFEE02, .payload = buildWritePayload(64,0x84),
+                  .exp_accepted = true, .exp_ack = true, .exp_cack_psn = FIRST_RX_PSN_3+0x101, .exp_ack_msn = 2, .exp_syndrome = 0x00, .exp_imm = {0xC0FFEE02}, .rkey_update = true, .after_cycles = DRAIN}),
         // RESPONDER SIDE
     };
 }
