@@ -878,6 +878,15 @@ namespace
                   .rqmsn = 0, .msn = 2, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xB3000, .r_key = RKEY, .dmalen = 64, .immDt = 0, .payload = buildWritePayload(64,0xA3),
                   .exp_accepted = false, .exp_ack = false, .exp_cack_psn = 0, .exp_ack_msn = 0, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
         
+        // QP D went to ERROR on the AETH NAK of row D04: a Write to it is dropped, although its PSN (0, the local psn of the
+        // setup) is the expected one
+        WRITE_TC({.name = "QP D IN ERROR 30a", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = REQ_QP_2, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = 0,
+                  .rqmsn = 0, .msn = 0, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xB4000, .r_key = RKEY, .dmalen = 64, .immDt = 0, .payload = buildWritePayload(64,0xA4),
+                  .exp_accepted = false, .exp_ack = false, .exp_cack_psn = 0, .exp_ack_msn = 0, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
+        // QP B never went to ERROR (same setup, psn 0): the same Write is accepted
+        WRITE_TC({.name = "QP B IN RTS 30b", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = REQ_QP_0, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = 0,
+                  .rqmsn = 0, .msn = 0, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xB5000, .r_key = RKEY, .dmalen = 64, .immDt = 0, .payload = buildWritePayload(64,0xA5),
+                  .exp_accepted = true, .exp_ack = true, .exp_cack_psn = 0, .exp_ack_msn = 1, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
         // RESPONDER SIDE
     };
 }

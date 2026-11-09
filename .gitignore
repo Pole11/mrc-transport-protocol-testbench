@@ -2,4 +2,3 @@ main
 run.log
 build/
 integration_trace.jsonl
-.claude/
