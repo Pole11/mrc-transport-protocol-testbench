@@ -855,6 +855,16 @@ namespace
         WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY_IMM 27a", .opcode = MRC_RDMA_WRITE_ONLY_IMM, .p_key = 0xFFFF, .dqp = RSP_QP_3, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+0x101,
                   .rqmsn = 2, .msn = 1, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xA0000, .r_key = RKEY, .dmalen = 64, .immDt = 0xC0FFEE02, .payload = buildWritePayload(64,0x84),
                   .exp_accepted = true, .exp_ack = true, .exp_cack_psn = FIRST_RX_PSN_3+0x101, .exp_ack_msn = 2, .exp_syndrome = 0x00, .exp_imm = {0xC0FFEE02}, .rkey_update = true, .after_cycles = DRAIN}),
+
+        // an unsupported opcode (0xC4: not a Write, not a control packet) is dropped without touching the QP state.
+        // The write that follows is still processed: one PSN ahead, so it is out of order
+        WRITE_TC({.name = "UNSUPPORTED 0xC4 28a", .opcode = 0xC4, .p_key = 0xFFFF, .dqp = RSP_QP_3, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+0x102,
+                  .rqmsn = 0, .msn = 2, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xA1000, .r_key = RKEY, .dmalen = 64, .immDt = 0, .payload = buildWritePayload(64,0x91),
+                  .exp_accepted = false, .exp_ack = false, .exp_cack_psn = 0, .exp_ack_msn = 0, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
+        WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY 28b", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = RSP_QP_3, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+0x103,
+                  .rqmsn = 0, .msn = 2, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xA2000, .r_key = RKEY, .dmalen = 64, .immDt = 0, .payload = buildWritePayload(64,0x92),
+                  .exp_accepted = true, .exp_ack = true, .exp_cack_psn = FIRST_RX_PSN_3+0x101, .exp_ack_msn = 2, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
+        
         // RESPONDER SIDE
     };
 }
