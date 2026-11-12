@@ -887,6 +887,22 @@ namespace
         WRITE_TC({.name = "QP B IN RTS 30b", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = REQ_QP_0, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = 0,
                   .rqmsn = 0, .msn = 0, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xB5000, .r_key = RKEY, .dmalen = 64, .immDt = 0, .payload = buildWritePayload(64,0xA5),
                   .exp_accepted = true, .exp_ack = true, .exp_cack_psn = 0, .exp_ack_msn = 1, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
+        
+        // max_wimm_inflight = 32 on QP B: after 31a the RQMSN head is 2, so RQMSN 33 (31b, ahead of the hole at PSN 2) still has a
+        // slot and RQMSN 34 (31c) does not: NAK Invalid Request (0x61) with its PSN, not written, QP to ERROR (Table 6-15).
+        // The hole arriving late (31d) is dropped: the QP is in ERROR, and the ImmDt of 31b is never released
+        WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY_IMM 31a", .opcode = MRC_RDMA_WRITE_ONLY_IMM, .p_key = 0xFFFF, .dqp = REQ_QP_0, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = 1,
+                  .rqmsn = 1, .msn = 1, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xB6000, .r_key = RKEY, .dmalen = 64, .immDt = 0xB0000001, .payload = buildWritePayload(64,0xA6),
+                  .exp_accepted = true, .exp_ack = true, .exp_cack_psn = 1, .exp_ack_msn = 2, .exp_syndrome = 0x00, .exp_imm = {0xB0000001}, .after_cycles = DRAIN}),
+        WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY_IMM 31b", .opcode = MRC_RDMA_WRITE_ONLY_IMM, .p_key = 0xFFFF, .dqp = REQ_QP_0, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = 3,
+                  .rqmsn = 33, .msn = 3, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xB7000, .r_key = RKEY, .dmalen = 64, .immDt = 0xB0000021, .payload = buildWritePayload(64,0xA7),
+                  .exp_accepted = true, .exp_ack = true, .exp_cack_psn = 1, .exp_ack_msn = 2, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
+        WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY_IMM 31c", .opcode = MRC_RDMA_WRITE_ONLY_IMM, .p_key = 0xFFFF, .dqp = REQ_QP_0, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = 4,
+                  .rqmsn = 34, .msn = 4, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xB8000, .r_key = RKEY, .dmalen = 64, .immDt = 0xB0000022, .payload = buildWritePayload(64,0xA8),
+                  .exp_accepted = false, .exp_ack = true, .exp_cack_psn = 4, .exp_ack_msn = 2, .exp_syndrome = 0x61, .exp_imm = {}, .after_cycles = DRAIN}),
+        WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY 31d", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = REQ_QP_0, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = 2,
+                  .rqmsn = 0, .msn = 2, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xB9000, .r_key = RKEY, .dmalen = 64, .immDt = 0, .payload = buildWritePayload(64,0xA9),
+                  .exp_accepted = false, .exp_ack = false, .exp_cack_psn = 0, .exp_ack_msn = 0, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
         // RESPONDER SIDE
     };
 }

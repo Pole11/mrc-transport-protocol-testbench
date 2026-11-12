@@ -17,7 +17,7 @@
 // 1. input         packets that starts with RETH
 // 2. metaIn        op_code, mrcExt(hasMth, rqmsn, msn, hasTseth, txTimestamp, tsr, hasImmDt, immDt)
 // it outputs       
-// 1. exhMetaFifo   numPkg (do we really need it?)
+// 1. exhMetaFifo   numPkg (do we really need it?), rqmsn (METH RQMSN, 0 without METH) for the max_wimm_inflight check in rx_ibh_fsm
 // 2. metaOut       op_code, RETH fields, hasImmDt*, immDt*
 // 3. output        the packet
 
@@ -132,7 +132,11 @@ namespace
 
         // exhMetaFifo: one per packet
         expect("exhMetaFifo count", tb.exhMetaFifo.size(), 1);
-        if (!tb.exhMetaFifo.empty()) expect("exhMeta.numPkg", tb.exhMetaFifo.read().numPkg, 1);
+        if (!tb.exhMetaFifo.empty()) {
+            const exhMeta e = tb.exhMetaFifo.read();
+            expect("exhMeta.numPkg", e.numPkg, 1);
+            expect("exhMeta.rqmsn",  e.rqmsn,  tc.exp_rqmsn); // same RQMSN as metaOut
+        }
 
         // metaOut: one per packet, RETH fields + MRC extension headers (+ ImmDt parsed here)
         expect("metaOut count", tb.metaOut.size(), 1);

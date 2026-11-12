@@ -9,6 +9,8 @@
 - `src/`
     - `integration/`
         - `dut_mrc_transport_protocol.cpp` is the integration test of the top module of the transport protocol
+    - `hdl/`
+        - `tb_*.sv` SystemVerilog testbenches of Coyote modules, run with xsim
     - `unit/`
         - `dut_*.cpp` one file per module devoted to unit test it
     - `main.cpp`
@@ -17,5 +19,6 @@
 
 ## How to run
 
-1. inside `Makefile` change the line `NETSTACK   := ../Coyote-mrc/hw/services/network/hls # change me` according to your Coyote directory
-2. `make run` to run all the tests
+1. in `Makefile` set `COYOTE` to your Coyote directory (or pass it: `make run COYOTE=...`)
+2. `make run` to run all the HLS tests
+3. `make hdl LYNX_PKG=<build_dir>/<project>_shell/hdl/lynx_pkg.sv` to run the HDL tests with xsim (`lynx_pkg.sv` is written by `make project` in a Coyote build with RDMA)

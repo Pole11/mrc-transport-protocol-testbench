@@ -2,9 +2,10 @@
 #   STEP      csim   : C simulation of every test (same as make run, with the Vitis libraries)
 #             csynth : synthesis of mrc_transport_protocol_top for each clock in TARGETS
 #             cosim  : synthesis at 4 ns + C/RTL co-simulation, waveform in cosim_prj/solution1/sim/verilog
-#   TB_DIR, NETSTACK: absolute paths of this repository and of the network stack hls folder
+#   TB_DIR, TB_HLS, NETSTACK: absolute paths of this repository, of its HLS tests and of the network stack hls folder
 
 set TB_DIR   $::env(TB_DIR)
+set TB_HLS   $::env(TB_HLS)
 set NETSTACK $::env(NETSTACK)
 set STEP     $::env(STEP)
 set CFLAGS   "-I$TB_DIR/include -I$NETSTACK -D__gmp_const=const"
@@ -14,8 +15,8 @@ set DATA_WIDTH 512
 set DUT_SRCS [list $NETSTACK/mrc_transport_protocol/mrc_transport_protocol.cpp \
                    $NETSTACK/mrc_transport_protocol/ib_utils.cpp \
                    $NETSTACK/axi_utils.cpp \
-                   {*}[glob $TB_DIR/src/top/*.cpp]]
-set TB_SRCS  [glob $TB_DIR/src/*.cpp $TB_DIR/src/integration/*.cpp $TB_DIR/src/unit/*/*.cpp]
+                   {*}[glob $TB_HLS/top/*.cpp]]
+set TB_SRCS  [glob $TB_DIR/src/*.cpp $TB_HLS/integration/*.cpp $TB_HLS/unit/*/*.cpp]
 
 open_project -reset ${STEP}_prj
 set_top mrc_transport_protocol_top

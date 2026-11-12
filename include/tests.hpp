@@ -2,7 +2,7 @@
 
 // integration
 int runMrcTransportProtocolTest();   // src/integration/dut_mrc_transport_protocol.cpp
-int runRocev2Test();                // src/integration/dut_rocev2.cpp
+int runRocev2Test();                 // src/integration/dut_rocev2.cpp
 
 // unit
 int runRxProcessIbhTest();          // src/unit/rx/dut_rx_process_ibh.cpp
