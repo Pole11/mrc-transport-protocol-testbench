@@ -48,6 +48,9 @@ namespace
         
         // an RX / CTRL read must report valid = false: qpn >= MAX_QPS, never set up, or in ERROR
         bool exp_invalid;
+
+        // QPI write: receive WQEs to post (0 = a setup). RX write: receive WQEs consumed (recvsUsed, subtracted)
+        uint16_t recvs;
     };
 
     struct StateTableTestBench
@@ -94,6 +97,7 @@ namespace
             request.sackTriggerCnt    = testCase.entry.resp_sack_trigger_cnt;
             request.rqmsn             = testCase.entry.resp_rqmsn;
             request.error             = testCase.error;
+            request.recvsUsed         = testCase.recvs;
         }
         return request;
     }
@@ -102,6 +106,8 @@ namespace
     {
         if (!testCase.write)
             return ifStateReq(testCase.qpn);
+        if (testCase.recvs)
+            return ifStateReq(testCase.qpn, testCase.recvs); // post receives
         ifStateReq request(testCase.qpn, testCase.entry.req_next_psn, testCase.selective);
         request.local_psn = testCase.entry.resp_epsn;
         return request;
@@ -153,6 +159,7 @@ namespace
                     expect("rcvdBytes",              r.rcvdBytes,              e.resp_rcvd_bytes);
                     expect("sackTriggerCnt",         r.sackTriggerCnt,         e.resp_sack_trigger_cnt);
                     expect("rqmsn",                  r.rqmsn,                  e.resp_rqmsn);
+                    expect("recvs",                  r.recvs,                  e.resp_recvs);
                 }
             }
             if (tc.port == RX_CTRL && !tb.stateTable2rxCtrl_rsp.empty()) {
@@ -175,6 +182,7 @@ namespace
                 expect("resp_rcvd_bytes",          s.resp_rcvd_bytes,          e.resp_rcvd_bytes);
                 expect("resp_sack_trigger_cnt",    s.resp_sack_trigger_cnt,    e.resp_sack_trigger_cnt);
                 expect("resp_rqmsn",               s.resp_rqmsn,               e.resp_rqmsn);
+                expect("resp_recvs",               s.resp_recvs,               e.resp_recvs);
                 expect("req_next_psn",             s.req_next_psn,             e.req_next_psn);
                 expect("req_old_unack",            s.req_old_unack,            e.req_old_unack);
                 expect("req_old_valid",            s.req_old_valid,            e.req_old_valid);
@@ -470,6 +478,33 @@ namespace
         {.name = "STATE 80 RX read QP2 head reset", .concurrent = false,
          .port = RX_IBH, .qpn = 2, .write = false, .isResponse = false, .selective = false,
          .entry = {.resp_epsn = 0x000400, .resp_old_outstanding = 0x000400, .resp_max_rcv_psn = 0x0003FF, .resp_lowest_unsacked_psn = 0x0003FF, .resp_rqmsn = 0x0001, .req_next_psn = 0x000E00, .req_old_unack = 0x000E00, .req_old_valid = 0x000E00, .retryCounter = 7, .state = READY_SEND}},
+
+        // receive WQEs (resp_recvs): a QPI post adds, an RX write subtracts recvsUsed instead of writing the value it read,
+        // so a post served between the RX read and the RX write is kept. A full setup clears them (rows 01-80: always 0)
+        {.name = "STATE 81 post 5 QP1", .concurrent = false,
+         .port = QPI, .qpn = 1, .write = true, .isResponse = false, .selective = false,
+         .entry = {.resp_epsn = 0x000200, .resp_old_outstanding = 0x000200, .resp_max_rcv_psn = 0x0001FF, .resp_lowest_unsacked_psn = 0x0001FF, .resp_rqmsn = 0x0001, .resp_recvs = 5, .req_next_psn = 0x000C01, .req_old_unack = 0x000ABC, .req_old_valid = 0x000C00, .retryCounter = 7, .state = READY_SEND}, .recvs = 5},
+        {.name = "STATE 82 RX read QP1", .concurrent = false,
+         .port = RX_IBH, .qpn = 1, .write = false, .isResponse = false, .selective = false,
+         .entry = {.resp_epsn = 0x000200, .resp_old_outstanding = 0x000200, .resp_max_rcv_psn = 0x0001FF, .resp_lowest_unsacked_psn = 0x0001FF, .resp_rqmsn = 0x0001, .resp_recvs = 5, .req_next_psn = 0x000C01, .req_old_unack = 0x000ABC, .req_old_valid = 0x000C00, .retryCounter = 7, .state = READY_SEND}},
+        {.name = "STATE 83 post 3 between read and write", .concurrent = false,
+         .port = QPI, .qpn = 1, .write = true, .isResponse = false, .selective = false,
+         .entry = {.resp_epsn = 0x000200, .resp_old_outstanding = 0x000200, .resp_max_rcv_psn = 0x0001FF, .resp_lowest_unsacked_psn = 0x0001FF, .resp_rqmsn = 0x0001, .resp_recvs = 8, .req_next_psn = 0x000C01, .req_old_unack = 0x000ABC, .req_old_valid = 0x000C00, .retryCounter = 7, .state = READY_SEND}, .recvs = 3},
+        {.name = "STATE 84 RX write uses 2", .concurrent = false,
+         .port = RX_IBH, .qpn = 1, .write = true, .isResponse = false, .selective = false,
+         .entry = {.resp_epsn = 0x000200, .resp_old_outstanding = 0x000200, .resp_max_rcv_psn = 0x0001FF, .resp_lowest_unsacked_psn = 0x0001FF, .resp_rqmsn = 0x0001, .resp_recvs = 6, .req_next_psn = 0x000C01, .req_old_unack = 0x000ABC, .req_old_valid = 0x000C00, .retryCounter = 7, .state = READY_SEND}, .recvs = 2},
+        {.name = "STATE 85 QPI read QP1", .concurrent = false,
+         .port = QPI, .qpn = 1, .write = false, .isResponse = false, .selective = false,
+         .entry = {.resp_epsn = 0x000200, .resp_old_outstanding = 0x000200, .resp_max_rcv_psn = 0x0001FF, .resp_lowest_unsacked_psn = 0x0001FF, .resp_rqmsn = 0x0001, .resp_recvs = 6, .req_next_psn = 0x000C01, .req_old_unack = 0x000ABC, .req_old_valid = 0x000C00, .retryCounter = 7, .state = READY_SEND}},
+        {.name = "STATE 86 RX read QP1", .concurrent = false,
+         .port = RX_IBH, .qpn = 1, .write = false, .isResponse = false, .selective = false,
+         .entry = {.resp_epsn = 0x000200, .resp_old_outstanding = 0x000200, .resp_max_rcv_psn = 0x0001FF, .resp_lowest_unsacked_psn = 0x0001FF, .resp_rqmsn = 0x0001, .resp_recvs = 6, .req_next_psn = 0x000C01, .req_old_unack = 0x000ABC, .req_old_valid = 0x000C00, .retryCounter = 7, .state = READY_SEND}},
+        {.name = "STATE 87 post to qpn 0x0101", .concurrent = false,
+         .port = QPI, .qpn = 0x0101, .write = true, .isResponse = false, .selective = false,
+         .entry = {}, .recvs = 4},
+        {.name = "STATE 88 QPI read QP1 still 6", .concurrent = false,
+         .port = QPI, .qpn = 1, .write = false, .isResponse = false, .selective = false,
+         .entry = {.resp_epsn = 0x000200, .resp_old_outstanding = 0x000200, .resp_max_rcv_psn = 0x0001FF, .resp_lowest_unsacked_psn = 0x0001FF, .resp_rqmsn = 0x0001, .resp_recvs = 6, .req_next_psn = 0x000C01, .req_old_unack = 0x000ABC, .req_old_valid = 0x000C00, .retryCounter = 7, .state = READY_SEND}},
         };
 } // namespace
 

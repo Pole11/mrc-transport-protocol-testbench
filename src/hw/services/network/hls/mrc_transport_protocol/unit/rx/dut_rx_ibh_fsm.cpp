@@ -53,6 +53,7 @@ namespace
         ap_uint<MRC_MPR> immmap;
         bool prevAr;
         uint16_t head; // RQMSN of the oldest WriteIMM not completed, 0 = 1 like after a QP setup
+        uint16_t recvs; // receive WQEs posted on the QP: one is consumed by every WriteIMM completion
 
         // expected: state table
         //bool exp_read;              // false = cache hit, no read request
@@ -68,6 +69,7 @@ namespace
         uint32_t exp_sackTriggerCnt;
         uint16_t exp_rqmsn; // RQMSN head written back, 0 = not checked
         bool exp_error;
+        int exp_recvsUsed = -1; // receive WQEs consumed by this packet, -1 = not checked
 
         // expected: metaOut (only accepted packets), the other ibhMeta fields must be unchanged
         bool exp_metaOut;
@@ -81,7 +83,7 @@ namespace
         // expected: ibhEventFifo (duplicates: an ACK with epsn - 1; WriteIMM beyond max_wimm_inflight: a NAK Invalid Request with psn)
         bool exp_event;
         uint32_t exp_event_psn;
-        bool exp_nak;
+        uint8_t exp_nak; // AETH NAK code, 0 = an ACK
 
         // expected: ibhDropFifo, ibhDropMetaFifo, regInvalidPsnDropCount (cumulative)
         bool exp_drop;
@@ -149,6 +151,7 @@ namespace
                     entry.rcvdBytes         = req.rcvdBytes;
                     entry.sackTriggerCnt    = req.sackTriggerCnt;
                     entry.rqmsn = req.rqmsn;
+                    entry.recvs -= req.recvsUsed; // subtracted like state_table does
                     writes.push_back(req);
                 } else {
                     stateTable_rsp.write(entry);
@@ -179,6 +182,7 @@ namespace
         state.sackTriggerCnt    = 0;
         state.valid             = true;
         state.rqmsn = testCase.head ? testCase.head : 1;
+        state.recvs = testCase.recvs;
 
         return state;
     }
@@ -214,6 +218,7 @@ namespace
             expect("write.sackTriggerCnt",      w.sackTriggerCnt,       tc.exp_sackTriggerCnt);
             if (tc.exp_rqmsn) expect("write.rqmsn", w.rqmsn, tc.exp_rqmsn); 
             expect("write.error", w.error, tc.exp_error);
+            if (tc.exp_recvsUsed >= 0) expect("write.recvsUsed", w.recvsUsed, tc.exp_recvsUsed);
         }
 
         // metaOut: accepted packets only, with msnInc / immInc / ackReq / cack computed and everything else unchanged
@@ -244,8 +249,8 @@ namespace
             expect("event.qpn",      e.qpn,      tc.dest_qp);
             expect("event.psn",      e.psn,      tc.exp_event_psn);
             expect("event.validPsn", e.validPsn, true);
-            expect("event.isNak", e.isNak, tc.exp_nak); 
-            if (tc.exp_nak) expect("event.nakCode", e.nakCode, AETH_NAK_INVALID_REQ);        
+            expect("event.isNak",    e.isNak,    tc.exp_nak != 0);
+            if (tc.exp_nak) expect("event.nakCode", e.nakCode, tc.exp_nak);
         }
 
         // drop decision: one value on each stream for every packet
@@ -331,7 +336,7 @@ namespace
          .exp_metaOut = true, .exp_msnInc = 0, .exp_ackReq = true, .exp_cack = 0x105, .exp_sackOffset = 64, .exp_oooCount = 1,
          .exp_regInvalidPsnDropCount = 5},
         {.name = "IBH FSM 13 QP2 ONLY a", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 2, .psn = 0x200, .ackReq = true, .udp_len = 1080,
-         .preload = true, .epsn = 0x200,
+         .preload = true, .epsn = 0x200, .recvs = 2,
          .exp_write = true, .exp_epsn = 0x201, .exp_maxRcvPsn = 0x200, .exp_lowestUnsackedPsn = 0x240, .exp_rcvdBytes = 1120,
          .exp_metaOut = true, .exp_msnInc = 1, .exp_ackReq = true, .exp_cack = 0x200,
          .exp_regInvalidPsnDropCount = 5},
@@ -340,7 +345,7 @@ namespace
          .exp_metaOut = true, .exp_msnInc = 1, .exp_immInc = 1, .exp_cack = 0x201,
          .exp_regInvalidPsnDropCount = 5},
         {.name = "IBH FSM 15 QP2 LAST IMM", .op_code = MRC_RDMA_WRITE_LAST_IMM, .partition_key = 0xFFFF, .dest_qp = 2, .psn = 0x202, .udp_len = 1080, .rqmsn = 2,
-         .exp_write = true, .exp_epsn = 0x203, .exp_maxRcvPsn = 0x202, .exp_lowestUnsackedPsn = 0x240, .exp_rcvdBytes = 3360, .exp_sackTriggerCnt = 2064, .exp_rqmsn = 3,
+         .exp_write = true, .exp_epsn = 0x203, .exp_maxRcvPsn = 0x202, .exp_lowestUnsackedPsn = 0x240, .exp_rcvdBytes = 3360, .exp_sackTriggerCnt = 2064, .exp_rqmsn = 3, .exp_recvsUsed = 1,
          .exp_metaOut = true, .exp_msnInc = 1, .exp_immInc = 1, .exp_cack = 0x202,
          .exp_regInvalidPsnDropCount = 5},
         {.name = "IBH FSM 16 QP1 again", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x106, .ackReq = true, .udp_len = 1080,
@@ -368,8 +373,8 @@ namespace
          .exp_write = true, .exp_epsn = 0x1, .exp_lowestUnsackedPsn = 0x40, .exp_rcvdBytes = 4480, .exp_rqmsn = 1,
          .exp_event = true, .exp_event_psn = 0x0, .exp_drop = true, .exp_ackOnly = true, .exp_regInvalidPsnDropCount = 6},
         {.name = "IBH FSM 22 full window", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 4, .psn = 0x1000, .udp_len = 1080,
-         .preload = true, .epsn = 0x1000, .bitmap = ALL_BUT_0, .lastmap = ALL_BUT_0, .immmap = ODD_BITS, .prevAr = true,
-         .exp_write = true, .exp_epsn = 0x1080, .exp_maxRcvPsn = 0x107F, .exp_lowestUnsackedPsn = 0x10BF, .exp_rcvdBytes = 1120, .exp_rqmsn = 65,
+         .preload = true, .epsn = 0x1000, .bitmap = ALL_BUT_0, .lastmap = ALL_BUT_0, .immmap = ODD_BITS, .prevAr = true, .recvs = 64,
+         .exp_write = true, .exp_epsn = 0x1080, .exp_maxRcvPsn = 0x107F, .exp_lowestUnsackedPsn = 0x10BF, .exp_rcvdBytes = 1120, .exp_rqmsn = 65, .exp_recvsUsed = 64,
          .exp_metaOut = true, .exp_msnInc = 128, .exp_immInc = 64, .exp_ackReq = true, .exp_cack = 0x107F,
          .exp_regInvalidPsnDropCount = 6},
         {.name = "IBH FSM 23 QP setup again", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 4, .psn = 0x2000, .ackReq = true, .udp_len = 1080,
@@ -424,7 +429,7 @@ namespace
          .exp_regInvalidPsnDropCount = 7},
         // two WriteIMMs ahead of a hole are marked in immmap but not completed; the FIRST that closes the hole completes both
         {.name = "IBH FSM 35 +2 LAST IMM", .op_code = MRC_RDMA_WRITE_LAST_IMM, .partition_key = 0xFFFF, .dest_qp = 7, .psn = 0x702, .udp_len = 1080, .rqmsn = 2,
-         .preload = true, .epsn = 0x700,
+         .preload = true, .epsn = 0x700, .recvs = 2,
          .exp_write = true, .exp_epsn = 0x700, .exp_bitmap = BIT(2), .exp_lastmap = BIT(2), .exp_immmap = BIT(2), .exp_maxRcvPsn = 0x702, .exp_lowestUnsackedPsn = 0x6FF, .exp_rcvdBytes = 1120, .exp_sackTriggerCnt = 1032, .exp_rqmsn = 1,
          .exp_metaOut = true, .exp_msnInc = 0, .exp_cack = 0x6FF, .exp_oooCount = 1,
          .exp_regInvalidPsnDropCount = 7},
@@ -433,7 +438,7 @@ namespace
          .exp_metaOut = true, .exp_msnInc = 0, .exp_cack = 0x6FF, .exp_oooCount = 2,
          .exp_regInvalidPsnDropCount = 7},
         {.name = "IBH FSM 37 +0 FIRST closes hole", .op_code = MRC_RDMA_WRITE_FIRST, .partition_key = 0xFFFF, .dest_qp = 7, .psn = 0x700, .udp_len = 1080,
-         .exp_write = true, .exp_epsn = 0x703, .exp_maxRcvPsn = 0x702, .exp_lowestUnsackedPsn = 0x702, .exp_rcvdBytes = 3360, .exp_sackTriggerCnt = 3100, .exp_rqmsn = 3,
+         .exp_write = true, .exp_epsn = 0x703, .exp_maxRcvPsn = 0x702, .exp_lowestUnsackedPsn = 0x702, .exp_rcvdBytes = 3360, .exp_sackTriggerCnt = 3100, .exp_rqmsn = 3, .exp_recvsUsed = 2,
          .exp_metaOut = true, .exp_msnInc = 2, .exp_immInc = 2, .exp_cack = 0x702,
          .exp_regInvalidPsnDropCount = 7},
         // max_wimm_inflight (MRC_MAX_WIMM = 32): a WriteIMM fits only with RQMSN head .. head + 31 (6.3.3). Beyond it: NAK Invalid Request
@@ -445,7 +450,7 @@ namespace
          .exp_regInvalidPsnDropCount = 7},
         {.name = "IBH FSM 39 IMM head + 32 NAK", .op_code = MRC_RDMA_WRITE_ONLY_IMM, .partition_key = 0xFFFF, .dest_qp = 8, .psn = 0x802, .ackReq = true, .udp_len = 1080, .rqmsn = 33,
          .exp_write = true, .exp_epsn = 0x800, .exp_bitmap = BIT(1), .exp_lastmap = BIT(1), .exp_immmap = BIT(1), .exp_maxRcvPsn = 0x801, .exp_lowestUnsackedPsn = 0x7FF, .exp_rcvdBytes = 2240, .exp_sackTriggerCnt = 2064, .exp_rqmsn = 1, .exp_error = true,
-         .exp_event = true, .exp_event_psn = 0x802, .exp_nak = true, .exp_drop = true, .exp_isDrop = true, .exp_regInvalidPsnDropCount = 7},
+         .exp_event = true, .exp_event_psn = 0x802, .exp_nak = AETH_NAK_INVALID_REQ, .exp_drop = true, .exp_isDrop = true, .exp_regInvalidPsnDropCount = 7},
         // the same across the 16-bit RQMSN wrap: head 0xFFF0, head + 31 = 0x000F
         {.name = "IBH FSM 40 IMM wrap head + 31", .op_code = MRC_RDMA_WRITE_ONLY_IMM, .partition_key = 0xFFFF, .dest_qp = 9, .psn = 0x901, .udp_len = 1080, .rqmsn = 0x000F,
          .preload = true, .epsn = 0x900, .head = 0xFFF0,
@@ -454,11 +459,29 @@ namespace
          .exp_regInvalidPsnDropCount = 7},
         {.name = "IBH FSM 41 IMM wrap head + 32 NAK", .op_code = MRC_RDMA_WRITE_LAST_IMM, .partition_key = 0xFFFF, .dest_qp = 9, .psn = 0x902, .udp_len = 1080, .rqmsn = 0x0010,
          .exp_write = true, .exp_epsn = 0x900, .exp_bitmap = BIT(1), .exp_lastmap = BIT(1), .exp_immmap = BIT(1), .exp_maxRcvPsn = 0x901, .exp_lowestUnsackedPsn = 0x8FF, .exp_rcvdBytes = 2240, .exp_sackTriggerCnt = 2064, .exp_rqmsn = 0xFFF0, .exp_error = true,
-         .exp_event = true, .exp_event_psn = 0x902, .exp_nak = true, .exp_drop = true, .exp_isDrop = true, .exp_regInvalidPsnDropCount = 7},
+         .exp_event = true, .exp_event_psn = 0x902, .exp_nak = AETH_NAK_INVALID_REQ, .exp_drop = true, .exp_isDrop = true, .exp_regInvalidPsnDropCount = 7},
         // a retransmitted WriteIMM already completed (RQMSN 1 behind head 3) is a duplicate, not a NAK
         {.name = "IBH FSM 42 old IMM duplicate", .op_code = MRC_RDMA_WRITE_ONLY_IMM, .partition_key = 0xFFFF, .dest_qp = 2, .psn = 0x201, .udp_len = 1080, .rqmsn = 1,
          .exp_write = true, .exp_epsn = 0x203, .exp_maxRcvPsn = 0x202, .exp_lowestUnsackedPsn = 0x242, .exp_rcvdBytes = 4480, .exp_rqmsn = 3,
          .exp_event = true, .exp_event_psn = 0x202, .exp_drop = true, .exp_ackOnly = true, .exp_regInvalidPsnDropCount = 8},
+        // receive WQEs: every WriteIMM completion consumes one. A packet that completes more WriteIMMs than the receives left:
+        // NAK Remote Operational Error with the packet psn, packet dropped, no metaOut, none of its completions released, QP to ERROR (6.3.3, Table 6-15)
+        {.name = "IBH FSM 43 IMM ahead of hole, 1 recv", .op_code = MRC_RDMA_WRITE_ONLY_IMM, .partition_key = 0xFFFF, .dest_qp = 10, .psn = 0xA01, .udp_len = 1080, .rqmsn = 2,
+         .preload = true, .epsn = 0xA00, .recvs = 1,
+         .exp_write = true, .exp_epsn = 0xA00, .exp_bitmap = BIT(1), .exp_lastmap = BIT(1), .exp_immmap = BIT(1), .exp_maxRcvPsn = 0xA01, .exp_lowestUnsackedPsn = 0x9FF, .exp_rcvdBytes = 1120, .exp_sackTriggerCnt = 1032, .exp_rqmsn = 1, .exp_recvsUsed = 0,
+         .exp_metaOut = true, .exp_msnInc = 0, .exp_cack = 0x9FF, .exp_oooCount = 1,
+         .exp_regInvalidPsnDropCount = 8},
+        {.name = "IBH FSM 44 IMM closes hole, 2 cpl 1 recv", .op_code = MRC_RDMA_WRITE_ONLY_IMM, .partition_key = 0xFFFF, .dest_qp = 10, .psn = 0xA00, .udp_len = 1080, .rqmsn = 1,
+         .exp_write = true, .exp_epsn = 0xA02, .exp_maxRcvPsn = 0xA01, .exp_lowestUnsackedPsn = 0xA01, .exp_rcvdBytes = 2240, .exp_sackTriggerCnt = 2064, .exp_rqmsn = 3, .exp_error = true, .exp_recvsUsed = 0,
+         .exp_event = true, .exp_event_psn = 0xA00, .exp_nak = AETH_NAK_REMOTE_OP_ERR, .exp_drop = true, .exp_isDrop = true, .exp_regInvalidPsnDropCount = 8},
+        {.name = "IBH FSM 45 plain ONLY, no recv", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 11, .psn = 0xB00, .udp_len = 1080,
+         .preload = true, .epsn = 0xB00,
+         .exp_write = true, .exp_epsn = 0xB01, .exp_maxRcvPsn = 0xB00, .exp_lowestUnsackedPsn = 0xB00, .exp_rcvdBytes = 1120, .exp_sackTriggerCnt = 1036, .exp_rqmsn = 1, .exp_recvsUsed = 0,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_cack = 0xB00,
+         .exp_regInvalidPsnDropCount = 8},
+        {.name = "IBH FSM 46 ONLY IMM, no recv", .op_code = MRC_RDMA_WRITE_ONLY_IMM, .partition_key = 0xFFFF, .dest_qp = 11, .psn = 0xB01, .udp_len = 1080, .rqmsn = 1,
+         .exp_write = true, .exp_epsn = 0xB02, .exp_maxRcvPsn = 0xB01, .exp_lowestUnsackedPsn = 0xB01, .exp_rcvdBytes = 2240, .exp_sackTriggerCnt = 2068, .exp_rqmsn = 2, .exp_error = true, .exp_recvsUsed = 0,
+         .exp_event = true, .exp_event_psn = 0xB01, .exp_nak = AETH_NAK_REMOTE_OP_ERR, .exp_drop = true, .exp_isDrop = true, .exp_regInvalidPsnDropCount = 8},
     };
 } // namespace
 

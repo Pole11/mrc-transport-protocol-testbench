@@ -19,6 +19,8 @@ namespace
 
     #define VERY_BIG_NUMBER 1000
 
+    #define RECVS 1000 // receive WQEs posted on every QP after its setup
+
     // local QPs acting as responder (send writes)
     #define RSP_QP_0 0x08   // write 1
     #define RSP_QP_1 0x09   // write 2
@@ -89,6 +91,8 @@ namespace
         bool reconnect;
         // update only the r_key of the QP just before this packet (virtual_address = 0xDEADBEEF): MSN and RQMSN carry on
         bool rkey_update;
+        // receive WQEs posted after a reconnect, 0 = RECVS
+        uint16_t recvs;
 
         // how many cycles before feeding next packet
         int32_t after_cycles;
@@ -902,6 +906,24 @@ namespace
                   .exp_accepted = false, .exp_ack = true, .exp_cack_psn = 4, .exp_ack_msn = 2, .exp_syndrome = 0x61, .exp_imm = {}, .after_cycles = DRAIN}),
         WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY 31d", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = REQ_QP_0, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = 2,
                   .rqmsn = 0, .msn = 2, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xB9000, .r_key = RKEY, .dmalen = 64, .immDt = 0, .payload = buildWritePayload(64,0xA9),
+                  .exp_accepted = false, .exp_ack = false, .exp_cack_psn = 0, .exp_ack_msn = 0, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
+        // receive WQEs: RSP_QP_3 set up again with 2 receives, every WriteIMM completion consumes one. 32a uses one, a plain
+        // Write (32b) none. 32d closes the hole in front of 32c and would complete 2 WriteIMMs with 1 receive left: NAK Remote
+        // Operational Error (0x63) with its PSN, not written, no ImmDt released, QP to ERROR (6.3.3, Table 6-15). 32e is dropped
+        WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY_IMM 32a", .opcode = MRC_RDMA_WRITE_ONLY_IMM, .p_key = 0xFFFF, .dqp = RSP_QP_3, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+0x200,
+                  .rqmsn = 1, .msn = 0, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xC1000, .r_key = RKEY, .dmalen = 64, .immDt = 0xD0000001, .payload = buildWritePayload(64,0xB1),
+                  .exp_accepted = true, .exp_ack = true, .exp_cack_psn = FIRST_RX_PSN_3+0x200, .exp_ack_msn = 1, .exp_syndrome = 0x00, .exp_imm = {0xD0000001}, .reconnect = true, .recvs = 2, .after_cycles = DRAIN}),
+        WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY 32b", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = RSP_QP_3, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+0x201,
+                  .rqmsn = 0, .msn = 1, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xC2000, .r_key = RKEY, .dmalen = 64, .immDt = 0, .payload = buildWritePayload(64,0xB2),
+                  .exp_accepted = true, .exp_ack = true, .exp_cack_psn = FIRST_RX_PSN_3+0x201, .exp_ack_msn = 2, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
+        WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY_IMM 32c", .opcode = MRC_RDMA_WRITE_ONLY_IMM, .p_key = 0xFFFF, .dqp = RSP_QP_3, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+0x203,
+                  .rqmsn = 3, .msn = 3, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xC3000, .r_key = RKEY, .dmalen = 64, .immDt = 0xD0000003, .payload = buildWritePayload(64,0xB3),
+                  .exp_accepted = true, .exp_ack = true, .exp_cack_psn = FIRST_RX_PSN_3+0x201, .exp_ack_msn = 2, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
+        WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY_IMM 32d", .opcode = MRC_RDMA_WRITE_ONLY_IMM, .p_key = 0xFFFF, .dqp = RSP_QP_3, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+0x202,
+                  .rqmsn = 2, .msn = 2, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xC4000, .r_key = RKEY, .dmalen = 64, .immDt = 0xD0000002, .payload = buildWritePayload(64,0xB4),
+                  .exp_accepted = false, .exp_ack = true, .exp_cack_psn = FIRST_RX_PSN_3+0x202, .exp_ack_msn = 2, .exp_syndrome = 0x63, .exp_imm = {}, .after_cycles = DRAIN}),
+        WRITE_TC({.name = "MRC_RDMA_WRITE_ONLY 32e", .opcode = MRC_RDMA_WRITE_ONLY, .p_key = 0xFFFF, .dqp = RSP_QP_3, .a = 1, .R = 0, .rtx = 0, .ts = 0, .psn = FIRST_RX_PSN_3+0x204,
+                  .rqmsn = 0, .msn = 4, .tx_timestamp = 0, .tsr = 0, .ftype = 0, .va = 0xC5000, .r_key = RKEY, .dmalen = 64, .immDt = 0, .payload = buildWritePayload(64,0xB5),
                   .exp_accepted = false, .exp_ack = false, .exp_cack_psn = 0, .exp_ack_msn = 0, .exp_syndrome = 0x00, .exp_imm = {}, .after_cycles = DRAIN}),
         // RESPONDER SIDE
     };

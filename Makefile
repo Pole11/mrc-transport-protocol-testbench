@@ -56,7 +56,7 @@ LYNX_PKG   ?=
 HDL_DIR    := build/hdl
 COYOTE_HDL  = $(abspath $(COYOTE)/hw/hdl)
 XSIM_BIN    = $(XILINX_VIVADO)/bin
-HDL_TESTS   = 2
+HDL_TESTS   = 3
 
 # $(call XSIM,top,sources): compile, elaborate and run one testbench
 XSIM = cd $(abspath $(HDL_DIR)) && $(XSIM_BIN)/xvlog -sv -i $(COYOTE_HDL)/pkg lynx_pkg.sv $(COYOTE_HDL)/pkg/lynx_intf.sv $(2) && \
@@ -66,10 +66,15 @@ hdl:
 	@test -f "$(LYNX_PKG)" || { echo "LYNX_PKG must be a lynx_pkg.sv, e.g. make hdl LYNX_PKG=<build_dir>/<project>_shell/hdl/lynx_pkg.sv"; exit 1; }
 	mkdir -p $(HDL_DIR)
 	sed -E 's/(localparam integer N_REGIONS = )[0-9]+/\13/' $(LYNX_PKG) > $(HDL_DIR)/lynx_pkg.sv
-	set -o pipefail; ( $(call XSIM,tb_rdma_imm_arbiter,$(COYOTE_HDL)/network/rdma/rdma_imm_arbiter.sv $(CURDIR)/src/hdl/network/rdma/tb_rdma_imm_arbiter.sv) && \
+	set -o pipefail; ( \
+	  $(call XSIM,tb_rdma_imm_arbiter,$(COYOTE_HDL)/network/rdma/rdma_imm_arbiter.sv $(CURDIR)/src/hdl/network/rdma/tb_rdma_imm_arbiter.sv) && \
 	  $(call XSIM,tb_rdma_imm_order,$(COYOTE_HDL)/common/queues/fifo.sv $(COYOTE_HDL)/common/queues/queue_meta.sv \
-	    $(COYOTE_HDL)/user/cq/rdma_imm_order.sv $(CURDIR)/src/hdl/user/cq/tb_rdma_imm_order.sv) ) | tee $(CURDIR)/$(LOG)
+	    $(COYOTE_HDL)/user/cq/rdma_imm_order.sv $(CURDIR)/src/hdl/user/cq/tb_rdma_imm_order.sv) && \
+	  $(call XSIM,tb_rdma_imm_csr,$(COYOTE_HDL)/pkg/axi_intf.sv $(COYOTE_HDL)/common/queues/fifo.sv $(COYOTE_HDL)/common/queues/queue_meta.sv \
+	    $(COYOTE_HDL)/user/cq/rdma_imm_csr.sv $(CURDIR)/src/hdl/user/cq/tb_rdma_imm_csr.sv) \
+	) | tee $(CURDIR)/$(LOG)
 	test $$(grep -c '^PASS' $(LOG)) -eq $(HDL_TESTS)
+
 all: cosim hdl
 
 clean:

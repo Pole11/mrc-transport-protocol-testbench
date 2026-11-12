@@ -490,14 +490,17 @@ int runMrcTransportProtocolTest()
         qpContext(READY_RECV, RSP_QP_2, 0x300, 0xFFFFFB, RKEY, 0x90000),         // wrap, ahead in window
         qpContext(READY_RECV, RSP_QP_3, 0x400, FIRST_RX_PSN_3, RKEY, 0xA0000)    // fresh QP for the rows 21-23
     };
+    // every QP gets RECVS receive WQEs after its setup, through qp_interface (virtual_address 0xCAFEBEEF, r_key = how many)
     for (const qpContext& c : rsp) {
         tb.qp_interface.write(c);
+        tb.qp_interface.write(qpContext(READY_RECV, c.qp_num, 0, 0, RECVS, 0xCAFEBEEF));
         tb.qp_connection_interface.write(ifConnReq(c.qp_num, REMOTE_QPN + c.qp_num - RSP_QP_0, REMOTE_IP, REMOTE_UDP_PORT));
         trace << "{\"qp\": " << c.qp_num.to_uint() << ", \"epsn\": " << c.local_psn.to_uint() << "}\n";
     }
 
     for (uint16_t qpn = REQ_QP_0; qpn <= REQ_QP_4; ++qpn) { // remote_psn = first PSN this QP sends
         tb.qp_interface.write(qpContext(READY_RECV, qpn, qpn == REQ_QP_4 ? REQ_PSN_F : REQ_PSN, 0, RKEY, 0));
+        tb.qp_interface.write(qpContext(READY_RECV, qpn, 0, 0, RECVS, 0xCAFEBEEF));
         tb.qp_connection_interface.write(ifConnReq(qpn, REMOTE_QPN + qpn - RSP_QP_0, REMOTE_IP, REMOTE_UDP_PORT));
     }
 
@@ -543,6 +546,8 @@ int runMrcTransportProtocolTest()
                         c.virtual_address = 0xDEADBEEF;
                     }
                     tb.qp_interface.write(c);
+                    if (tc.write.reconnect) // a full setup clears the receives: post them again
+                        tb.qp_interface.write(qpContext(READY_RECV, c.qp_num, 0, 0, tc.write.recvs ? tc.write.recvs : RECVS, 0xCAFEBEEF));
                 }
             for (int i = 0; i < 20; ++i) tb.tickOneCycle();
         }

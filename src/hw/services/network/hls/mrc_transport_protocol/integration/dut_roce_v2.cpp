@@ -175,6 +175,7 @@ int runRocev2Test()
     Rocev2TestBench tb;
 
     tb.qp_interface.write(qpContext(READY_RECV, QPN, 0x500, FIRST_PSN, 0x1234, 0));
+    tb.qp_interface.write(qpContext(READY_RECV, QPN, 0, 0, 16, 0xCAFEBEEF)); // post 16 receives: every WriteIMM completion consumes one
     tb.conn_interface.write(ifConnReq(QPN, 0x22, 0x0A000002, RDMA_DEFAULT_PORT));
     for (int c = 0; c < 50; ++c) tb.tickOneCycle();
 
