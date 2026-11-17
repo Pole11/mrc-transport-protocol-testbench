@@ -53,7 +53,10 @@ namespace
         ap_uint<MRC_MPR> immmap;
         bool prevAr;
         uint16_t head; // RQMSN of the oldest WriteIMM not completed, 0 = 1 like after a QP setup
-        uint16_t recvs; // receive WQEs posted on the QP: one is consumed by every WriteIMM completion
+        uint16_t recvs; // resp_recvs_posted: receive WQEs posted on the QP since setup, one is consumed by every WriteIMM completion
+        uint16_t used;  // resp_recvs_used: receive WQEs consumed since setup (16-bit counters, available = recvs - used modulo 2^16)
+        // input: receive WQEs posted before the packet, also without preload (qp_interface: resp_recvs_posted += post)
+        uint16_t post;
 
         // expected: state table
         //bool exp_read;              // false = cache hit, no read request
@@ -69,7 +72,7 @@ namespace
         uint32_t exp_sackTriggerCnt;
         uint16_t exp_rqmsn; // RQMSN head written back, 0 = not checked
         bool exp_error;
-        int exp_recvsUsed = -1; // receive WQEs consumed by this packet, -1 = not checked
+        int exp_recvsUsed = -1; // resp_recvs_used written back: the new total since setup, not a delta. -1 = not checked
 
         // expected: metaOut (only accepted packets), the other ibhMeta fields must be unchanged
         bool exp_metaOut;
@@ -151,7 +154,7 @@ namespace
                     entry.rcvdBytes         = req.rcvdBytes;
                     entry.sackTriggerCnt    = req.sackTriggerCnt;
                     entry.rqmsn = req.rqmsn;
-                    entry.recvs -= req.recvsUsed; // subtracted like state_table does
+                    entry.recvsUsed = req.recvsUsed; // written like state_table does, recvsPosted is not touched by RX
                     writes.push_back(req);
                 } else {
                     stateTable_rsp.write(entry);
@@ -182,7 +185,8 @@ namespace
         state.sackTriggerCnt    = 0;
         state.valid             = true;
         state.rqmsn = testCase.head ? testCase.head : 1;
-        state.recvs = testCase.recvs;
+        state.recvsPosted = testCase.recvs;
+        state.recvsUsed   = testCase.used;
 
         return state;
     }
@@ -345,7 +349,7 @@ namespace
          .exp_metaOut = true, .exp_msnInc = 1, .exp_immInc = 1, .exp_cack = 0x201,
          .exp_regInvalidPsnDropCount = 5},
         {.name = "IBH FSM 15 QP2 LAST IMM", .op_code = MRC_RDMA_WRITE_LAST_IMM, .partition_key = 0xFFFF, .dest_qp = 2, .psn = 0x202, .udp_len = 1080, .rqmsn = 2,
-         .exp_write = true, .exp_epsn = 0x203, .exp_maxRcvPsn = 0x202, .exp_lowestUnsackedPsn = 0x240, .exp_rcvdBytes = 3360, .exp_sackTriggerCnt = 2064, .exp_rqmsn = 3, .exp_recvsUsed = 1,
+         .exp_write = true, .exp_epsn = 0x203, .exp_maxRcvPsn = 0x202, .exp_lowestUnsackedPsn = 0x240, .exp_rcvdBytes = 3360, .exp_sackTriggerCnt = 2064, .exp_rqmsn = 3, .exp_recvsUsed = 2,
          .exp_metaOut = true, .exp_msnInc = 1, .exp_immInc = 1, .exp_cack = 0x202,
          .exp_regInvalidPsnDropCount = 5},
         {.name = "IBH FSM 16 QP1 again", .op_code = MRC_RDMA_WRITE_ONLY, .partition_key = 0xFFFF, .dest_qp = 1, .psn = 0x106, .ackReq = true, .udp_len = 1080,
@@ -482,6 +486,25 @@ namespace
         {.name = "IBH FSM 46 ONLY IMM, no recv", .op_code = MRC_RDMA_WRITE_ONLY_IMM, .partition_key = 0xFFFF, .dest_qp = 11, .psn = 0xB01, .udp_len = 1080, .rqmsn = 1,
          .exp_write = true, .exp_epsn = 0xB02, .exp_maxRcvPsn = 0xB01, .exp_lowestUnsackedPsn = 0xB01, .exp_rcvdBytes = 2240, .exp_sackTriggerCnt = 2068, .exp_rqmsn = 2, .exp_error = true, .exp_recvsUsed = 0,
          .exp_event = true, .exp_event_psn = 0xB01, .exp_nak = AETH_NAK_REMOTE_OP_ERR, .exp_drop = true, .exp_isDrop = true, .exp_regInvalidPsnDropCount = 8},
+        // the counters wrap at 16 bits: posted 0x0001, used 0xFFFF is 2 receives available. A post served between two packets
+        // (only resp_recvs_posted changes) is seen by the next one
+        {.name = "IBH FSM 47 IMM, used wraps", .op_code = MRC_RDMA_WRITE_ONLY_IMM, .partition_key = 0xFFFF, .dest_qp = 12, .psn = 0xC00, .udp_len = 1080, .rqmsn = 1,
+         .preload = true, .epsn = 0xC00, .recvs = 0x0001, .used = 0xFFFF,
+         .exp_write = true, .exp_epsn = 0xC01, .exp_maxRcvPsn = 0xC00, .exp_lowestUnsackedPsn = 0xC00, .exp_rcvdBytes = 1120, .exp_sackTriggerCnt = 1032, .exp_rqmsn = 2, .exp_recvsUsed = 0x0000,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_immInc = 1, .exp_cack = 0xC00,
+         .exp_regInvalidPsnDropCount = 8},
+        {.name = "IBH FSM 48 IMM, last recv", .op_code = MRC_RDMA_WRITE_ONLY_IMM, .partition_key = 0xFFFF, .dest_qp = 12, .psn = 0xC01, .udp_len = 1080, .rqmsn = 2,
+         .exp_write = true, .exp_epsn = 0xC02, .exp_maxRcvPsn = 0xC01, .exp_lowestUnsackedPsn = 0xC01, .exp_rcvdBytes = 2240, .exp_sackTriggerCnt = 2064, .exp_rqmsn = 3, .exp_recvsUsed = 0x0001,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_immInc = 1, .exp_cack = 0xC01,
+         .exp_regInvalidPsnDropCount = 8},
+        {.name = "IBH FSM 49 post 1, IMM", .op_code = MRC_RDMA_WRITE_ONLY_IMM, .partition_key = 0xFFFF, .dest_qp = 12, .psn = 0xC02, .udp_len = 1080, .rqmsn = 3,
+         .post = 1,
+         .exp_write = true, .exp_epsn = 0xC03, .exp_maxRcvPsn = 0xC02, .exp_lowestUnsackedPsn = 0xC02, .exp_rcvdBytes = 3360, .exp_sackTriggerCnt = 3096, .exp_rqmsn = 4, .exp_recvsUsed = 0x0002,
+         .exp_metaOut = true, .exp_msnInc = 1, .exp_immInc = 1, .exp_cack = 0xC02,
+         .exp_regInvalidPsnDropCount = 8},
+        {.name = "IBH FSM 50 IMM, posted == used NAK", .op_code = MRC_RDMA_WRITE_ONLY_IMM, .partition_key = 0xFFFF, .dest_qp = 12, .psn = 0xC03, .udp_len = 1080, .rqmsn = 4,
+         .exp_write = true, .exp_epsn = 0xC04, .exp_maxRcvPsn = 0xC03, .exp_lowestUnsackedPsn = 0xC03, .exp_rcvdBytes = 4480, .exp_sackTriggerCnt = 4128, .exp_rqmsn = 5, .exp_error = true, .exp_recvsUsed = 0x0002,
+         .exp_event = true, .exp_event_psn = 0xC03, .exp_nak = AETH_NAK_REMOTE_OP_ERR, .exp_drop = true, .exp_isDrop = true, .exp_regInvalidPsnDropCount = 8},
     };
 } // namespace
 
@@ -499,6 +522,7 @@ int runRxIbhFsmTest()
             tb.stateTable[tc.dest_qp & 0xFFFF] = buildRxStateRsp(tc);
             //tb.stateTableInv.write(tc.dest_qp & 0xFFFF); // like state_table does on a QP setup
         }
+        tb.stateTable[tc.dest_qp & 0xFFFF].recvsPosted += tc.post; // like qp_interface does on a post
         tb.metaIn.write(buildIbhMeta(tc));
         tb.udpLenIn.write(tc.udp_len);
         tb.exhMetaFifo.write(exhMeta(1, tc.rqmsn));
